@@ -11,11 +11,15 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SystemProgram,
   Transaction,
   TransactionInstruction,
   sendAndConfirmTransaction,
   type Signer,
 } from "@solana/web3.js";
+
+const DIM = "\x1b[2m";
+const OFF = "\x1b[0m";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -70,29 +74,46 @@ export function loadOrCreateWallet(name: string): Keypair {
   return kp;
 }
 
-/** Tops a wallet up from the devnet faucet if it is below `minSol`. */
+/**
+ * Ensures a wallet holds at least `minSol`, or explains exactly how to fund it.
+ *
+ * Deliberately does NOT read the operator's personal keypair. Devnet's airdrop
+ * RPC currently answers 410 Gone, so funding is a manual, explicit step — which
+ * is the right shape for anything that moves money, even play money.
+ */
 export async function ensureFunded(
   conn: Connection,
   kp: Keypair,
   minSol: number,
   label: string,
 ): Promise<number> {
-  const lamports = await conn.getBalance(kp.publicKey);
-  const sol = lamports / 1e9;
+  const balance = async (): Promise<number> => (await conn.getBalance(kp.publicKey)) / 1e9;
+
+  let sol = await balance();
   if (sol >= minSol) return sol;
 
-  console.log(`  ${label} has ${sol.toFixed(4)} SOL, requesting airdrop…`);
+  const needed = minSol - sol;
+  console.log(`  ${label} has ${sol.toFixed(4)} SOL, needs ${minSol}`);
+
   try {
-    const sig = await conn.requestAirdrop(kp.publicKey, 1e9);
+    const sig = await conn.requestAirdrop(kp.publicKey, Math.ceil(needed * 1e9));
     await conn.confirmTransaction(sig, "confirmed");
-  } catch (err) {
-    throw new Error(
-      `${label} has ${sol.toFixed(4)} SOL (need ${minSol}) and the faucet refused: ` +
-        `${err instanceof Error ? err.message : String(err)}. ` +
-        `Fund ${kp.publicKey.toBase58()} manually, e.g. at https://faucet.solana.com`,
-    );
+    sol = await balance();
+    if (sol >= minSol) {
+      console.log(`  airdropped → ${sol.toFixed(4)} SOL`);
+      return sol;
+    }
+  } catch {
+    console.log(`  ${DIM}devnet faucet unavailable${OFF}`);
   }
-  return (await conn.getBalance(kp.publicKey)) / 1e9;
+
+  throw new Error(
+    `${label} (${kp.publicKey.toBase58()}) holds ${sol.toFixed(4)} SOL but needs ${minSol}.\n` +
+      `  The devnet airdrop RPC is closed, so fund it with one of:\n` +
+      `    solana transfer ${kp.publicKey.toBase58()} ${(needed + 0.05).toFixed(2)} ` +
+      `-u devnet --allow-unfunded-recipient\n` +
+      `    or paste the address into https://faucet.solana.com`,
+  );
 }
 
 /* ------------------------------------------------------------------ *
