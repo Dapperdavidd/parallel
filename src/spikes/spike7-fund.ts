@@ -62,8 +62,12 @@ function writePageConfig(market: string, collateralMint: string): void {
     ),
   );
   const appId = readEnv("PRIVY_APP_ID");
+  const rpc = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
   if (appId) {
-    writeFileSync("spike7/.env.local", `VITE_PRIVY_APP_ID=${appId}\n`);
+    writeFileSync(
+      "spike7/.env.local",
+      `VITE_PRIVY_APP_ID=${appId}\nVITE_SOLANA_RPC=${rpc}\n`,
+    );
     console.log(`  wrote spike7/public/devnet.json and spike7/.env.local`);
   } else {
     console.log(`  wrote spike7/public/devnet.json`);
