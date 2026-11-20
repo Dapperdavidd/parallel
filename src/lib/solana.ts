@@ -61,6 +61,47 @@ export function getConnection(): Connection {
 }
 
 /* ------------------------------------------------------------------ *
+ * RPC resilience
+ *
+ * The public devnet endpoint drops connections regularly. A spike that dies
+ * halfway through leaves on-chain state half-built, so reads retry.
+ * ------------------------------------------------------------------ */
+
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  what: string,
+  attempts = 4,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        const wait = 500 * 2 ** i;
+        console.log(`  ${DIM}${what} failed (attempt ${i + 1}/${attempts}), retrying in ${wait}ms${OFF}`);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+  }
+  throw new Error(
+    `${what} failed after ${attempts} attempts: ` +
+      `${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+  );
+}
+
+/** Reads an account, retrying through transient RPC failures. */
+export async function getAccountData(conn: Connection, pubkey: PublicKey): Promise<Buffer> {
+  const info = await withRetry(
+    () => conn.getAccountInfo(pubkey, "confirmed"),
+    `read ${pubkey.toBase58().slice(0, 8)}…`,
+  );
+  if (!info) throw new Error(`account ${pubkey.toBase58()} not found`);
+  return info.data;
+}
+
+/* ------------------------------------------------------------------ *
  * Wallets — gitignored, devnet only (PRD rule 9)
  * ------------------------------------------------------------------ */
 
@@ -96,7 +137,8 @@ export async function ensureFunded(
   minSol: number,
   label: string,
 ): Promise<number> {
-  const balance = async (): Promise<number> => (await conn.getBalance(kp.publicKey)) / 1e9;
+  const balance = async (): Promise<number> =>
+    (await withRetry(() => conn.getBalance(kp.publicKey), `balance of ${label}`)) / 1e9;
 
   let sol = await balance();
   if (sol >= minSol) return sol;
@@ -148,6 +190,33 @@ function isTransient(msg: string): boolean {
   return /block height exceeded|blockhash|fetch failed|timeout|ECONNRESET|503|502|429|Too Many Requests|was not confirmed/i.test(
     msg,
   );
+}
+
+/**
+ * Did a transaction we lost track of actually land?
+ *
+ * A confirmation timeout does NOT mean the transaction failed — it means we
+ * stopped watching. Blindly resending is how you open a position twice. This
+ * cost us a duplicated trade in spike 3 before it was added: the open landed,
+ * the confirm timed out, the retry fired, and the second attempt came back
+ * `EngineLockActive` against a position that already existed.
+ */
+async function landed(conn: Connection, signature: string): Promise<boolean> {
+  try {
+    const st = await conn.getSignatureStatus(signature, { searchTransactionHistory: true });
+    const v = st.value;
+    if (!v) return false;
+    if (v.err) return false;
+    return v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized";
+  } catch {
+    return false;
+  }
+}
+
+/** web3.js attaches the signature to expiry errors; dig it out if present. */
+function signatureOf(err: unknown): string | null {
+  const s = (err as { signature?: unknown })?.signature;
+  return typeof s === "string" && s.length > 0 ? s : null;
 }
 
 /**
@@ -204,6 +273,20 @@ export async function send(
     } catch (err) {
       lastErr = err;
       const msg = err instanceof Error ? err.message : String(err);
+
+      // Before concluding anything, find out whether it actually landed.
+      // A confirmation timeout means we stopped watching, not that it failed.
+      const sig = signatureOf(err);
+      if (sig) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if (await landed(conn, sig)) {
+          const ms = Date.now() - t0;
+          logSignature({ label, signature: sig, ms, ok: true, attempts: attempt });
+          console.log(`  ✓ ${label} — ${ms}ms (confirm timed out, but it landed) — ${sig}`);
+          return sig;
+        }
+      }
+
       if (attempt < attempts && isTransient(msg)) {
         console.log(`  ${DIM}${label}: ${msg.split("\n")[0]} — retrying (${attempt}/${attempts})${OFF}`);
         await new Promise((r) => setTimeout(r, 1000 * attempt));
@@ -233,47 +316,6 @@ const SIG_LOG = "out/signatures.jsonl";
 export function logSignature(rec: SigRecord): void {
   mkdirSync("out", { recursive: true });
   appendFileSync(SIG_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + "\n");
-}
-
-/* ------------------------------------------------------------------ *
- * RPC resilience
- *
- * The public devnet endpoint drops connections regularly. A spike that dies
- * halfway through leaves on-chain state half-built, so reads retry.
- * ------------------------------------------------------------------ */
-
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  what: string,
-  attempts = 4,
-): Promise<T> {
-  let lastErr: unknown;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      if (i < attempts - 1) {
-        const wait = 500 * 2 ** i;
-        console.log(`  ${DIM}${what} failed (attempt ${i + 1}/${attempts}), retrying in ${wait}ms${OFF}`);
-        await new Promise((r) => setTimeout(r, wait));
-      }
-    }
-  }
-  throw new Error(
-    `${what} failed after ${attempts} attempts: ` +
-      `${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
-  );
-}
-
-/** Reads an account, retrying through transient RPC failures. */
-export async function getAccountData(conn: Connection, pubkey: PublicKey): Promise<Buffer> {
-  const info = await withRetry(
-    () => conn.getAccountInfo(pubkey, "confirmed"),
-    `read ${pubkey.toBase58().slice(0, 8)}…`,
-  );
-  if (!info) throw new Error(`account ${pubkey.toBase58()} not found`);
-  return info.data;
 }
 
 /* ------------------------------------------------------------------ *

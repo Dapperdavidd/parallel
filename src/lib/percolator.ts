@@ -417,6 +417,23 @@ export function vaultAuthority(market: PublicKey): PublicKey {
  * instruction in v16. Getting one wrong means building a new market.
  * ------------------------------------------------------------------ */
 
+/**
+ * Position scale. A `sizeQ` of 1_000_000 is one contract.
+ * Notional in collateral atoms = ceil(sizeQ * price_e6 / POS_SCALE).
+ */
+export const POS_SCALE = 1_000_000n;
+
+/** Contracts -> the engine's signed sizeQ. Positive is long. */
+export function toSizeQ(contracts: number): bigint {
+  return BigInt(Math.round(contracts * Number(POS_SCALE)));
+}
+
+/** Notional value in collateral atoms, which is what margin is a fraction of. */
+export function notionalAtoms(sizeQ: bigint, priceE6: bigint): bigint {
+  const n = sizeQ < 0n ? -sizeQ : sizeQ;
+  return (n * priceE6) / POS_SCALE;
+}
+
 export const MAX_PRICE_MOVE_BPS_PER_SLOT = 24n;
 export const MAX_ACCRUAL_DT_SLOTS = 10n;
 export const LIQUIDATION_FEE_BPS = 5n;
