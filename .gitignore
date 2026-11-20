@@ -1,0 +1,27 @@
+# ---- secrets & keys (NEVER commit) ----
+.env
+.env.*
+!.env.example
+wallets/
+*.pem
+*-keypair.json
+id.json
+
+# ---- local-only working notes ----
+# DECISIONS.md is the full agent-handoff decision log. It stays local by the
+# user's explicit instruction (2026-11-20): the next agent runs on this same
+# Mac and reads the folder directly, so it does not need to travel via git.
+DECISIONS.md
+
+# ---- cloned upstream reference repos (read-only research) ----
+reference/
+
+# ---- run artifacts: logs, tx signatures, generated market manifests ----
+out/
+
+# ---- node / typescript ----
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+npm-debug.log*

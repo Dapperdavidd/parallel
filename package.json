@@ -1,0 +1,28 @@
+{
+  "name": "parallel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Parallel — perpetual futures on emerging-market currencies, on Solana devnet via Percolator. Phase 1: feasibility scripts only.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "spike1": "tsx src/spikes/spike1-market.ts",
+    "spike2": "tsx src/spikes/spike2-oracle-push.ts",
+    "spike3": "tsx src/spikes/spike3-trade.ts",
+    "spike4": "tsx src/spikes/spike4-liquidation.ts",
+    "spike5": "tsx src/spikes/spike5-index.ts",
+    "spike6": "tsx src/spikes/spike6-oracle-loop.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.98.0",
+    "bs58": "^6.0.0",
+    "dotenv": "^17.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2"
+  }
+}
