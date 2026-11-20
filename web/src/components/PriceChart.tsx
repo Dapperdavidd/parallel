@@ -7,6 +7,7 @@ import {
   CrosshairMode,
   LineStyle,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
@@ -45,6 +46,7 @@ export function PriceChart({
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const officialRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const markRef = useRef<IPriceLine | null>(null);
 
   // Create once.
   useEffect(() => {
@@ -79,6 +81,10 @@ export function PriceChart({
       borderDownColor: "#E5484D",
       wickUpColor: "#2EBD85",
       wickDownColor: "#E5484D",
+      // The mark price line below carries the label. Without this, its badge
+      // and the series' own last-value badge stack on top of each other.
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
 
     officialRef.current = chart.addLineSeries({
@@ -96,6 +102,7 @@ export function PriceChart({
       chartRef.current = null;
       candleRef.current = null;
       officialRef.current = null;
+      markRef.current = null;
     };
   }, []);
 
@@ -120,8 +127,11 @@ export function PriceChart({
       data.map((c) => ({ time: c.time as UTCTimestamp, value: market.off })),
     );
 
-    // Mark price: a labelled line at the latest index value.
-    candles.createPriceLine({
+    // Mark price: a labelled line at the latest index value. Remove the
+    // previous one first — createPriceLine adds, it does not replace, so
+    // changing market or timeframe would otherwise stack lines up.
+    if (markRef.current) candles.removePriceLine(markRef.current);
+    markRef.current = candles.createPriceLine({
       price: market.px,
       color: "#3D5CF5",
       lineWidth: 1,
@@ -148,7 +158,7 @@ export function PriceChart({
   return (
     <div
       ref={hostRef}
-      style={{ width: "100%", height: 420 }}
+      className="chart-host"
       role="img"
       aria-label={`USD/${market.c} price chart`}
     />

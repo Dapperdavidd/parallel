@@ -175,18 +175,36 @@ export interface SourceReading {
   inMedian: boolean;
 }
 
-/** Per-source breakdown, spread realistically around the median. */
+/**
+ * Per-source breakdown.
+ *
+ * The offsets are deliberately symmetric around zero so the MEDIAN of what we
+ * show is exactly the street price in the headline. "A price you can check" is
+ * the whole pitch — if a reviewer adds up the sources and gets a different
+ * number than the big one on the page, the product looks broken.
+ */
 export function sourceReadings(m: Market): SourceReading[] {
   let seed = m.c.charCodeAt(1) * 17 + 3;
   const rnd = (): number => {
     seed = (seed * 9301 + 49297) % 233280;
     return seed / 233280;
   };
-  return m.src.map((name) => {
-    const drift = (rnd() - 0.5) * 0.012; // within about ±0.6%
-    const rate = m.px * (1 + drift);
-    return { name, rate, inMedian: Math.abs(drift) <= 0.03 };
-  });
+
+  const n = m.src.length;
+  const spread = 0.0015 + rnd() * 0.002; // a few tenths of a percent apart
+  const offsets: number[] = [];
+  for (let i = 0; i < n; i++) {
+    // -1, 0, +1 for three sources; -1, +1 for two. Median offset is always 0.
+    const rank = i - (n - 1) / 2;
+    offsets.push(rank * spread);
+  }
+
+  return m.src.map((name, i) => ({
+    name,
+    rate: m.px * (1 + offsets[i]!),
+    // The index drops a source more than 3% from the median (PRD oracle rule 3).
+    inMedian: Math.abs(offsets[i]!) <= 0.03,
+  }));
 }
 
 /** How long ago the index last pushed on-chain. */

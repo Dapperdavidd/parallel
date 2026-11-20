@@ -1,0 +1,98 @@
+/**
+ * Screenshot a page through the DevTools Protocol with real device emulation,
+ * optionally scrolled to an element, optionally full-page.
+ *
+ * Plain `--window-size` screenshots do not emulate a device, so the layout can
+ * differ from what a phone actually renders. Using CDP keeps the picture and
+ * any measurements in agreement.
+ *
+ *   node scripts/shot.mjs <url> <out.png> [width] [height] [--full] [--to=#sel]
+ */
+
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { setTimeout as sleep } from "node:timers/promises";
+
+const args = process.argv.slice(2);
+const flags = args.filter((a) => a.startsWith("--"));
+const pos = args.filter((a) => !a.startsWith("--"));
+
+const URL_ = pos[0] ?? "http://localhost:3000/";
+const OUT = pos[1] ?? "/tmp/shot.png";
+const WIDTH = Number(pos[2] ?? 1440);
+const HEIGHT = Number(pos[3] ?? 900);
+const FULL = flags.includes("--full");
+const MOBILE = WIDTH < 820;
+const TO = flags.find((f) => f.startsWith("--to="))?.slice(5);
+
+const PORT = 9223;
+const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+
+const chrome = spawn(CHROME, [
+  "--headless=new",
+  "--disable-gpu",
+  "--hide-scrollbars",
+  `--remote-debugging-port=${PORT}`,
+  "--no-first-run",
+  "--user-data-dir=/tmp/chrome-shot-profile",
+  "about:blank",
+], { stdio: "ignore" });
+
+const cleanup = () => { try { chrome.kill(); } catch { /* gone */ } };
+process.on("exit", cleanup);
+
+let target;
+for (let i = 0; i < 40; i++) {
+  await sleep(300);
+  try {
+    const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+    target = list.find((t) => t.type === "page");
+    if (target?.webSocketDebuggerUrl) break;
+  } catch { /* not up */ }
+}
+if (!target) { console.error("could not reach Chrome"); process.exit(1); }
+
+const ws = new WebSocket(target.webSocketDebuggerUrl);
+await new Promise((r) => ws.addEventListener("open", r, { once: true }));
+
+let id = 0;
+const pending = new Map();
+ws.addEventListener("message", (ev) => {
+  const m = JSON.parse(ev.data);
+  if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
+});
+const send = (method, params = {}) =>
+  new Promise((res) => { const n = ++id; pending.set(n, res); ws.send(JSON.stringify({ id: n, method, params })); });
+
+await send("Page.enable");
+await send("Emulation.setDeviceMetricsOverride", {
+  width: WIDTH, height: HEIGHT, deviceScaleFactor: 2, mobile: MOBILE,
+});
+await send("Page.navigate", { url: URL_ });
+await sleep(5500);
+
+if (TO) {
+  await send("Runtime.evaluate", {
+    expression: `(()=>{const e=document.querySelector(${JSON.stringify(TO)});
+      if(e){const y=e.getBoundingClientRect().top+scrollY;scrollTo({top:y,behavior:"instant"});}})()`,
+  });
+  await sleep(1800);
+}
+
+const params = { format: "png", captureBeyondViewport: FULL };
+if (FULL) {
+  const { result } = await send("Runtime.evaluate", {
+    expression: `JSON.stringify({w:document.documentElement.scrollWidth,h:document.documentElement.scrollHeight})`,
+    returnByValue: true,
+  });
+  const { w, h } = JSON.parse(result.result.value);
+  params.clip = { x: 0, y: 0, width: w, height: Math.min(h, 20000), scale: 1 };
+}
+
+const shot = await send("Page.captureScreenshot", params);
+writeFileSync(OUT, Buffer.from(shot.result.data, "base64"));
+console.log(`${OUT}  ${WIDTH}x${HEIGHT}${MOBILE ? " (mobile)" : ""}${FULL ? " full" : ""}`);
+
+ws.close();
+cleanup();
+process.exit(0);

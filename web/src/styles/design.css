@@ -240,3 +240,26 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
   -webkit-mask-image:url(/media/parallel-logo-glass.png);
   mask-image:url(/media/parallel-logo-glass.png);
 }
+
+/* ---------- polish fixes found in review ---------- */
+
+/* Phone: the hero paragraph carries max-width:400px, and a flex item will not
+   shrink below its content by default. On a 414px screen that pushed the whole
+   document wider than the viewport, so the nav and banner were clipped. */
+.hero-bottom > *{min-width:0}
+.hero p{max-width:min(400px,100%)}
+
+/* Nothing on the page should be able to scroll the document sideways. */
+html,body{max-width:100%;overflow-x:hidden}
+
+/* Let the chart take the room the trade layout actually has, instead of a
+   fixed 420px that leaves dead space under the positions table. */
+.chart-host{flex:1 1 auto;min-height:320px;width:100%}
+
+/* The footer link columns were `repeat(3,minmax(130px,1fr))` with 48px gaps,
+   which is a hard 486px floor — wider than a phone, so the whole document
+   scrolled sideways and clipped the nav and hero copy. (Bug inherited from the
+   hand-off prototype.) minmax(0,...) lets the columns actually shrink, and
+   they drop to two across on narrow screens. */
+.fcols{grid-template-columns:repeat(3,minmax(0,1fr));gap:40px}
+@media (max-width:620px){.fcols{grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}}

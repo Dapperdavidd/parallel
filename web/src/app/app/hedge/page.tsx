@@ -30,17 +30,29 @@ export default function HedgePage() {
     return Math.max(1, Math.round(ms / 86_400_000));
   }, [date]);
 
-  // Outcome table: what the hedge is worth if the local currency moves.
+  /**
+   * Outcome table.
+   *
+   * `pct` is what the LOCAL CURRENCY does, which is how a person thinks about
+   * it: −10% means the naira loses a tenth of its value. That is the case you
+   * hedge against. (Quoting it as a move in the NGN-per-USD rate inverts the
+   * sign and reads backwards to everyone who is not a trader.)
+   */
+  const dollarsBefore = amount / m.px;
   const outcomes = MOVES.map((pct) => {
-    // A weaker local currency means more units per dollar.
-    const newRate = m.px * (1 + pct / 100);
-    const localValueOfSavings = amount; // unchanged in local terms
-    const dollarsBefore = amount / m.px;
-    const dollarsAfter = localValueOfSavings / newRate;
+    const dollarsAfter = dollarsBefore * (1 + pct / 100);
     const lossWithout = dollarsAfter - dollarsBefore;
-    // A 1x long USD position of the same dollar size gains what the savings lose.
+    // A 1x long USD position the same dollar size gains what the savings lose.
     const hedgeGain = -lossWithout;
-    return { pct, dollarsAfter, lossWithout, hedgeGain, net: lossWithout + hedgeGain };
+    // Keep -0 out of the display.
+    const z = (v: number): number => (Object.is(v, -0) || Math.abs(v) < 0.005 ? 0 : v);
+    return {
+      pct,
+      dollarsAfter,
+      lossWithout: z(lossWithout),
+      hedgeGain: z(hedgeGain),
+      net: z(lossWithout + hedgeGain),
+    };
   });
 
   const place = (): void => {
@@ -124,7 +136,7 @@ export default function HedgePage() {
             Size<b>{fmt(usd)} tUSDC</b>
           </div>
           <div className="row">
-            Today worth<b>${fmt(usd)}</b>
+            You hold<b>{m.sym}{fmt(amount, 0)}</b>
           </div>
           <div className="row">
             Holding for<b>{days} days</b>
@@ -151,7 +163,7 @@ export default function HedgePage() {
         <table className="postable" style={{ minWidth: 560 }}>
           <thead>
             <tr>
-              <th>Move</th>
+              <th>{m.c} moves</th>
               <th>Your {m.c} is worth</th>
               <th>Without a hedge</th>
               <th>Hedge pays</th>
@@ -161,17 +173,17 @@ export default function HedgePage() {
           <tbody>
             {outcomes.map((o) => (
               <tr key={o.pct}>
-                <td>
+                <td style={{ color: o.pct < 0 ? "var(--dn)" : o.pct > 0 ? "var(--up)" : undefined }}>
                   {o.pct > 0 ? "+" : ""}
                   {o.pct}%
                 </td>
                 <td>${fmt(o.dollarsAfter)}</td>
                 <td style={{ color: o.lossWithout < 0 ? "var(--dn)" : "var(--ink2)" }}>
-                  {o.lossWithout >= 0 ? "+" : ""}
+                  {o.lossWithout > 0 ? "+" : ""}
                   {fmt(o.lossWithout)}
                 </td>
                 <td style={{ color: o.hedgeGain > 0 ? "var(--up)" : "var(--ink2)" }}>
-                  {o.hedgeGain >= 0 ? "+" : ""}
+                  {o.hedgeGain > 0 ? "+" : ""}
                   {fmt(o.hedgeGain)}
                 </td>
                 <td style={{ color: "var(--ink)" }}>{fmt(o.net)}</td>
@@ -181,8 +193,9 @@ export default function HedgePage() {
         </table>
       </div>
       <p style={{ fontSize: 13, color: "var(--ink3)", marginTop: 12, lineHeight: 1.6 }}>
-        A negative move means the {m.name.split(" ").slice(1).join(" ")} weakens against the
-        dollar. The hedge is sized so the two columns cancel. Devnet test funds only.
+        A negative move means the {m.name.split(" ").slice(1).join(" ")} loses value against the
+        dollar — the case you are protecting against. The hedge is sized so the two columns
+        cancel out. Devnet test funds only.
       </p>
     </div>
   );

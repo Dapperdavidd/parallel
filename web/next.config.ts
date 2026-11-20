@@ -9,6 +9,9 @@ import path from "node:path";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.join(__dirname),
+  // The floating dev badge sits over the bottom-left of the hero, which is
+  // exactly where the headline is. Off, so design review sees the real thing.
+  devIndicators: false,
 };
 
 export default nextConfig;
