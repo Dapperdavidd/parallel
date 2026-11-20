@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "inspect": "tsx src/spikes/inspect.ts",
     "spike7:fund": "tsx src/spikes/spike7-fund.ts",
-    "spike7": "npm --prefix spike7 run dev"
+    "spike7": "npm --prefix spike7 run dev",
+    "spike7:verify": "tsx src/spikes/spike7-verify.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",

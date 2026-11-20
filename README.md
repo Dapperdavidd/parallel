@@ -41,7 +41,7 @@ price endpoints.
 | 4 | `npm run spike4` | Liquidation of a high-leverage position | ✅ |
 | 5 | `npm run spike5` | Street price index with median / outlier / pause rules | ✅ |
 | 6 | `npm run spike6` | Oracle loop with the push-on-move rule | ✅ |
-| 7 | — | Privy embedded wallet signs a Percolator trade | needs a Privy app ID |
+| 7 | `npm run spike7` | Privy email wallet holds mock USDC and signs Percolator instructions | ✅ |
 
 Useful alongside them:
 
