@@ -33,15 +33,26 @@ price endpoints.
 
 ## The spikes
 
-| # | Command | Proves |
-|---|---|---|
-| 1 | `npm run spike1` | Mock USDC mint + a Percolator naira market with our wallet as oracle authority |
-| 2 | `npm run spike2` | Oracle push, read-back, and the per-slot price cap |
-| 3 | `npm run spike3` | Open a long and a short, crank, funding and PnL, close both |
-| 4 | `npm run spike4` | Liquidation of a high-leverage position |
-| 5 | `npm run spike5` | ✅ Street price index with median / outlier / pause rules |
-| 6 | `npm run spike6` | 30-minute oracle loop with the push-on-move rule |
-| 7 | — | Privy embedded wallet signs a Percolator trade |
+| # | Command | Proves | |
+|---|---|---|---|
+| 1 | `npm run spike1` | Mock USDC mint + a naira market with our wallet as oracle authority | ✅ |
+| 2 | `npm run spike2` | Oracle push, read-back, and the per-slot price cap | ✅ |
+| 3 | `npm run spike3` | Open a long and a short, crank, PnL, close both | ✅ |
+| 4 | `npm run spike4` | Liquidation of a high-leverage position | ✅ |
+| 5 | `npm run spike5` | Street price index with median / outlier / pause rules | ✅ |
+| 6 | `npm run spike6` | Oracle loop with the push-on-move rule | ✅ |
+| 7 | — | Privy embedded wallet signs a Percolator trade | needs a Privy app ID |
+
+Useful alongside them:
+
+```bash
+npm run inspect                  # live market, oracle profile and portfolios
+npm run spike6 -- --dry-run      # index loop without touching the chain
+npm run spike1 -- --fresh        # rebuild the market from scratch
+```
+
+Spikes 1–4 and 6 touch devnet and need a funded wallet. Devnet's airdrop RPC is
+closed, so they print the exact `solana transfer` command if a wallet is short.
 
 ## Layout
 
