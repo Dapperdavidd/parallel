@@ -15,7 +15,9 @@
     "spike5": "tsx src/spikes/spike5-index.ts",
     "spike6": "tsx src/spikes/spike6-oracle-loop.ts",
     "typecheck": "tsc --noEmit",
-    "inspect": "tsx src/spikes/inspect.ts"
+    "inspect": "tsx src/spikes/inspect.ts",
+    "spike7:fund": "tsx src/spikes/spike7-fund.ts",
+    "spike7": "npm --prefix spike7 run dev"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",

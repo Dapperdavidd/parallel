@@ -25,3 +25,9 @@ dist/
 *.tsbuildinfo
 .DS_Store
 npm-debug.log*
+
+# spike 7 test page
+spike7/node_modules/
+spike7/dist/
+spike7/.env.local
+spike7/public/devnet.json
