@@ -24,17 +24,24 @@
  */
 
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { PERCOLATOR_PROGRAM_ID } from "./solana.js";
 import {
   MARKET_GROUP_OFF,
   MARKET_GROUP_HEADER_LEN,
   ASSET_SLOT_LEN,
+  ASSET_ORACLE_WRAPPER_LEN,
+  PORTFOLIO_ACCOUNT_LEN,
   marketAccountLenFor,
   encInitMarket,
+  encInitPortfolio,
+  encDeposit,
+  encPermissionlessCrank,
+  encTradeNoCpi,
   type InitMarketArgs,
 } from "../vendor/percolator-v16/index.js";
 
-export { marketAccountLenFor, encInitMarket, type InitMarketArgs };
+export { marketAccountLenFor, PORTFOLIO_ACCOUNT_LEN, encInitMarket, type InitMarketArgs };
 
 /* ------------------------------------------------------------------ *
  * Little-endian writers (the vendored module does not export its own)
@@ -90,8 +97,24 @@ export const ORACLE_MODE = {
 export const ASSET_ORACLE_PROFILE_LEN = 424;
 export const ASSET_CONTROL_SEQUENCES_LEN = 88;
 
+/**
+ * Start of an asset's slot. Each slot is laid out as:
+ *
+ *   +0    oracle wrapper   512 B  = oracle profile (424) + control sequences (88)
+ *   +512  engine asset    1285 B
+ *
+ * So `parseAssetOracleProfile` takes THIS offset, while `parseAsset` (the engine
+ * state, where effective_price and raw_oracle_target_price live) takes
+ * `assetEngineOffset`. Passing the wrong one parses adjacent bytes as prices and
+ * yields plausible-looking nonsense rather than an error.
+ */
 export function assetSlotOffset(assetIndex: number): number {
   return MARKET_GROUP_OFF + MARKET_GROUP_HEADER_LEN + assetIndex * ASSET_SLOT_LEN;
+}
+
+/** Offset of the engine asset state within the market account. */
+export function assetEngineOffset(assetIndex: number): number {
+  return assetSlotOffset(assetIndex) + ASSET_ORACLE_WRAPPER_LEN;
 }
 
 export function assetControlSequencesOffset(assetIndex: number): number {
@@ -243,6 +266,129 @@ export function ixAuthMark(
     ],
     data,
   });
+}
+
+/**
+ * InitPortfolio: [owner(signer), market(writable), portfolio(writable)].
+ * The portfolio account must already exist, be `PORTFOLIO_ACCOUNT_LEN` bytes,
+ * rent-exempt, and owned by the Percolator program.
+ */
+export function ixInitPortfolio(
+  owner: PublicKey,
+  market: PublicKey,
+  portfolio: PublicKey,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: PERCOLATOR_PROGRAM_ID,
+    keys: [
+      { pubkey: owner, isSigner: true, isWritable: false },
+      { pubkey: market, isSigner: false, isWritable: true },
+      { pubkey: portfolio, isSigner: false, isWritable: true },
+    ],
+    data: encInitPortfolio(),
+  });
+}
+
+/** Deposit: [owner(s), market(w), portfolio(w), ownerAta(w), vaultAta(w), tokenProgram]. */
+export function ixDeposit(
+  owner: PublicKey,
+  market: PublicKey,
+  portfolio: PublicKey,
+  ownerAta: PublicKey,
+  vaultAta: PublicKey,
+  amount: bigint,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: PERCOLATOR_PROGRAM_ID,
+    keys: [
+      { pubkey: owner, isSigner: true, isWritable: false },
+      { pubkey: market, isSigner: false, isWritable: true },
+      { pubkey: portfolio, isSigner: false, isWritable: true },
+      { pubkey: ownerAta, isSigner: false, isWritable: true },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: encDeposit(amount),
+  });
+}
+
+/**
+ * PermissionlessCrank: [keeper(signer), market(writable), portfolio(writable)].
+ *
+ * One crank progresses exactly ONE portfolio — v16 is account-local and there is
+ * no slab to page through. The "64 accounts per crank" in older docs is the
+ * per-market asset-slot ceiling, not a page size.
+ *
+ * `oracleAccounts: 0` because an AuthMark asset has no external feed, so no
+ * oracle accounts are appended.
+ *
+ * This is also what walks `effective_price` toward the pushed target, and what
+ * performs liquidations (with `closeQ != 0`).
+ */
+export function ixCrank(
+  keeper: PublicKey,
+  market: PublicKey,
+  portfolio: PublicKey,
+  opts: { assetIndex?: number; nowSlot: bigint; closeQ?: bigint } ,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: PERCOLATOR_PROGRAM_ID,
+    keys: [
+      { pubkey: keeper, isSigner: true, isWritable: false },
+      { pubkey: market, isSigner: false, isWritable: true },
+      { pubkey: portfolio, isSigner: false, isWritable: true },
+    ],
+    data: encPermissionlessCrank({
+      nowSlot: opts.nowSlot,
+      closeQ: opts.closeQ ?? 0n,
+      observations: [{ assetIndex: opts.assetIndex ?? 0, oracleAccounts: 0 }],
+    }),
+  });
+}
+
+/** TradeNoCpi: [signerA, signerB, market(w), portfolioA(w), portfolioB(w)]. */
+export function ixTradeNoCpi(
+  signerA: PublicKey,
+  signerB: PublicKey,
+  market: PublicKey,
+  portfolioA: PublicKey,
+  portfolioB: PublicKey,
+  args: { assetIndex: number; sizeQ: bigint; execPrice: bigint; feeBps: bigint },
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: PERCOLATOR_PROGRAM_ID,
+    keys: [
+      { pubkey: signerA, isSigner: true, isWritable: false },
+      { pubkey: signerB, isSigner: true, isWritable: false },
+      { pubkey: market, isSigner: false, isWritable: true },
+      { pubkey: portfolioA, isSigner: false, isWritable: true },
+      { pubkey: portfolioB, isSigner: false, isWritable: true },
+    ],
+    data: encTradeNoCpi(args),
+  });
+}
+
+/**
+ * The engine's per-slot price clamp, mirrored for prediction.
+ *   max_delta = p_last * cap_bps * dt_slots / 10_000
+ * Used by spike 2 to state what the circuit breaker *should* do before observing
+ * what it does.
+ */
+export function clampTowardTarget(
+  pLast: bigint,
+  target: bigint,
+  capBps: bigint,
+  dtSlots: bigint,
+): bigint {
+  if (pLast === 0n || target === 0n) return target;
+  if (capBps === 0n || dtSlots === 0n) return pLast;
+  const maxDelta = (pLast * capBps * dtSlots) / 10_000n;
+  if (target > pLast) {
+    const up = pLast + maxDelta;
+    return target < up ? target : up;
+  }
+  const down = maxDelta >= pLast ? 0n : pLast - maxDelta;
+  return target > down ? target : down;
 }
 
 /* ------------------------------------------------------------------ *

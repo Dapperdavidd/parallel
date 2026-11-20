@@ -41,6 +41,15 @@ export const MATCHER_PROGRAM_ID = new PublicKey(
 export const HEAP_FRAME_BYTES = 256 * 1024;
 export const DEFAULT_COMPUTE_UNITS = 1_400_000;
 
+/**
+ * Priority fee. Devnet is congested enough that unprioritised transactions get
+ * dropped and expire before confirmation — observed repeatedly on 2026-11-20.
+ * Upstream's own test suite uses the same 50,000 microLamports.
+ */
+export const DEFAULT_PRIORITY_MICROLAMPORTS = Number(
+  process.env.PRIORITY_MICROLAMPORTS ?? 50_000,
+);
+
 export function getConnection(): Connection {
   if (!/devnet/i.test(DEVNET_RPC)) {
     throw new Error(
@@ -125,11 +134,29 @@ export interface SendOpts {
   /** Set false for instructions that never touch the heap (e.g. plain transfers). */
   heapFrame?: boolean;
   label: string;
+  /** Retries for transient failures. Program errors are never retried. */
+  attempts?: number;
+}
+
+/**
+ * A failure worth retrying: the network dropped the request or the blockhash
+ * expired before confirmation. A `custom program error` is deterministic — the
+ * program rejected the instruction — and retrying it only wastes time.
+ */
+function isTransient(msg: string): boolean {
+  if (/custom program error|invalid instruction data|insufficient funds/i.test(msg)) return false;
+  return /block height exceeded|blockhash|fetch failed|timeout|ECONNRESET|503|502|429|Too Many Requests|was not confirmed/i.test(
+    msg,
+  );
 }
 
 /**
  * Sends instructions with Percolator's required compute budget and heap frame,
  * then logs the signature (PRD rule 9: log every transaction signature).
+ *
+ * Retries transient RPC failures with a fresh blockhash. The public devnet
+ * endpoint drops requests and lets transactions expire often enough that the
+ * oracle keeper would be unreliable without this.
  */
 export async function send(
   conn: Connection,
@@ -137,39 +164,65 @@ export async function send(
   ixs: TransactionInstruction[],
   opts: SendOpts,
 ): Promise<string> {
-  const { computeUnits = DEFAULT_COMPUTE_UNITS, heapFrame = true, label } = opts;
-
-  const tx = new Transaction();
-  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnits }));
-  if (heapFrame) tx.add(ComputeBudgetProgram.requestHeapFrame({ bytes: HEAP_FRAME_BYTES }));
-  for (const ix of ixs) tx.add(ix);
+  const {
+    computeUnits = DEFAULT_COMPUTE_UNITS,
+    heapFrame = true,
+    label,
+    attempts = 3,
+  } = opts;
 
   const payer = signers[0];
   if (!payer) throw new Error("send() needs at least one signer");
 
   const t0 = Date.now();
-  try {
-    const sig = await sendAndConfirmTransaction(conn, tx, signers, {
-      commitment: "confirmed",
-      skipPreflight: false,
-    });
-    const ms = Date.now() - t0;
-    logSignature({ label, signature: sig, ms, ok: true });
-    console.log(`  ✓ ${label} — ${ms}ms — ${sig}`);
-    return sig;
-  } catch (err) {
-    const ms = Date.now() - t0;
-    const msg = err instanceof Error ? err.message : String(err);
-    logSignature({ label, signature: null, ms, ok: false, error: msg });
-    console.error(`  ✗ ${label} — ${ms}ms — ${msg}`);
-    throw err;
+  let lastErr: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    // A fresh Transaction each time, so it picks up a new blockhash.
+    const tx = new Transaction();
+    tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnits }));
+    // Escalate the priority fee on each retry — if the first price was too low
+    // to land during a congestion spike, repeating it will not help.
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: DEFAULT_PRIORITY_MICROLAMPORTS * attempt,
+      }),
+    );
+    if (heapFrame) tx.add(ComputeBudgetProgram.requestHeapFrame({ bytes: HEAP_FRAME_BYTES }));
+    for (const ix of ixs) tx.add(ix);
+
+    try {
+      const sig = await sendAndConfirmTransaction(conn, tx, signers, {
+        commitment: "confirmed",
+        skipPreflight: false,
+        maxRetries: 10,
+      });
+      const ms = Date.now() - t0;
+      logSignature({ label, signature: sig, ms, ok: true, attempts: attempt });
+      console.log(`  ✓ ${label} — ${ms}ms${attempt > 1 ? ` (attempt ${attempt})` : ""} — ${sig}`);
+      return sig;
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt < attempts && isTransient(msg)) {
+        console.log(`  ${DIM}${label}: ${msg.split("\n")[0]} — retrying (${attempt}/${attempts})${OFF}`);
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+        continue;
+      }
+      const ms = Date.now() - t0;
+      logSignature({ label, signature: null, ms, ok: false, error: msg, attempts: attempt });
+      console.error(`  ✗ ${label} — ${ms}ms — ${msg}`);
+      throw err;
+    }
   }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 export interface SigRecord {
   label: string;
   signature: string | null;
   ms: number;
+  attempts?: number;
   ok: boolean;
   error?: string;
 }
@@ -180,6 +233,47 @@ const SIG_LOG = "out/signatures.jsonl";
 export function logSignature(rec: SigRecord): void {
   mkdirSync("out", { recursive: true });
   appendFileSync(SIG_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + "\n");
+}
+
+/* ------------------------------------------------------------------ *
+ * RPC resilience
+ *
+ * The public devnet endpoint drops connections regularly. A spike that dies
+ * halfway through leaves on-chain state half-built, so reads retry.
+ * ------------------------------------------------------------------ */
+
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  what: string,
+  attempts = 4,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        const wait = 500 * 2 ** i;
+        console.log(`  ${DIM}${what} failed (attempt ${i + 1}/${attempts}), retrying in ${wait}ms${OFF}`);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+  }
+  throw new Error(
+    `${what} failed after ${attempts} attempts: ` +
+      `${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+  );
+}
+
+/** Reads an account, retrying through transient RPC failures. */
+export async function getAccountData(conn: Connection, pubkey: PublicKey): Promise<Buffer> {
+  const info = await withRetry(
+    () => conn.getAccountInfo(pubkey, "confirmed"),
+    `read ${pubkey.toBase58().slice(0, 8)}…`,
+  );
+  if (!info) throw new Error(`account ${pubkey.toBase58()} not found`);
+  return info.data;
 }
 
 /* ------------------------------------------------------------------ *
