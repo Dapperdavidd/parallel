@@ -263,3 +263,94 @@ html,body{max-width:100%;overflow-x:hidden}
    they drop to two across on narrow screens. */
 .fcols{grid-template-columns:repeat(3,minmax(0,1fr));gap:40px}
 @media (max-width:620px){.fcols{grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}}
+
+/* ================= full-bleed hero (new background video) ================= */
+/* The hero is now a real full-screen stage: the video covers the whole
+   viewport and the banner, nav, glass logo and headline all sit on top of it.
+   Replaces the old inset rounded card. */
+
+.hero-full{position:relative;width:100%;height:100svh;min-height:560px;overflow:hidden;background:#0B0B0C}
+@supports not (height:100svh){.hero-full{height:100vh}}
+
+.hero-full video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:60% 50%}
+@media (max-width:820px){
+  /* Portrait crop: hold the subject, who sits centre-right in frame. */
+  .hero-full video{object-position:62% 45%}
+}
+
+/* The footage is bright daylight, so white type needs a real scrim rather
+   than the light wash the old dark video could get away with. */
+.hero-scrim{position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(180deg,rgba(11,11,12,.82) 0,rgba(11,11,12,.34) 14%,rgba(11,11,12,0) 30%),
+    linear-gradient(0deg,rgba(11,11,12,.94) 0,rgba(11,11,12,.72) 22%,rgba(11,11,12,.18) 48%,rgba(11,11,12,0) 68%),
+    radial-gradient(70% 55% at 18% 88%,rgba(11,11,12,.72),rgba(11,11,12,0) 72%)}
+
+/* Banner + nav ride on top of the video. */
+.hero-chrome{position:absolute;top:0;left:0;right:0;z-index:4}
+.hero-chrome .topbanner{border-bottom:1px solid rgba(255,255,255,.1);background:rgba(11,11,12,.42);backdrop-filter:blur(8px)}
+.hero-chrome .lnav{position:static;background:none}
+
+/* Headline block, bottom-left, above the scrim. */
+.hero-copy{position:absolute;left:0;right:0;bottom:0;z-index:4;
+  padding:0 48px 56px;display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap}
+.hero-copy h1{font-size:clamp(46px,6.6vw,104px);line-height:.95;letter-spacing:-.05em;margin:0;
+  text-shadow:0 2px 40px rgba(0,0,0,.55)}
+.hero-copy p{margin:0;font-size:17px;line-height:1.6;color:#D7D7DA;max-width:min(420px,100%);
+  text-shadow:0 1px 20px rgba(0,0,0,.6)}
+@media (max-width:820px){.hero-copy{padding:0 22px 40px;gap:22px}}
+
+/* A scroll cue, since the hero now fills the screen and nothing peeks below. */
+.hero-cue{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:4;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  font-size:11px;letter-spacing:.16em;color:rgba(245,245,244,.55);pointer-events:none}
+.hero-cue i{display:block;width:1px;height:26px;background:linear-gradient(rgba(245,245,244,.5),transparent);
+  animation:cue 2.4s ease-in-out infinite}
+@keyframes cue{0%,100%{opacity:.25;transform:translateY(-4px)}50%{opacity:1;transform:translateY(2px)}}
+@media (max-width:820px){.hero-cue{display:none}}
+@media (prefers-reduced-motion:reduce){.hero-cue i{animation:none}}
+
+/* The glass logo keeps its spec, but sits higher on the full-screen stage so
+   it never crowds the headline. */
+.hero-full .logo-float{z-index:3;left:62%;top:42%;height:46%}
+@media (max-width:820px){.hero-full .logo-float{left:50%;top:30%;height:26%}}
+
+/* Keep the headline and the copy/CTA side by side on desktop, as the design
+   has them. Without explicit flex bases they size to max-content and wrap. */
+.hero-copy > :first-child{flex:1 1 420px;min-width:0}
+.hero-copy > :last-child{flex:0 1 420px;min-width:0}
+@media (max-width:900px){
+  .hero-copy{flex-direction:column;align-items:flex-start}
+  .hero-copy > *{flex:0 0 auto}
+}
+
+/* Hero layout, corrected.
+   Absolutely positioning the copy at bottom:0 breaks as soon as the copy is
+   taller than the stage — on a 390x844 phone it overflowed upwards and sat on
+   top of the nav. Flex column instead: chrome in flow at the top, copy pushed
+   to the bottom with margin-top:auto. The video, scrim and logo stay absolute
+   behind it. This holds at any viewport height. */
+.hero-full{display:flex;flex-direction:column}
+.hero-chrome{position:relative;z-index:4}
+.hero-copy{position:relative;z-index:4;margin-top:auto;bottom:auto;left:auto;right:auto}
+
+@media (max-width:900px){
+  .hero-copy h1{font-size:clamp(40px,11vw,64px)}
+  .hero-copy p{font-size:16px}
+  .hero-copy{padding:0 22px 36px;gap:18px}
+  /* Give the logo the space between the nav and the copy, and keep it clear
+     of both. */
+  .hero-full .logo-float{top:36%;height:24%}
+}
+
+/* The mobile reset above used `.hero-copy > *` (specificity 0,1,0) against
+   `.hero-copy > :first-child` (0,2,0), so it never won and the 420px
+   flex-basis became a 420px HEIGHT once the row turned into a column. Match
+   the selectors so the reset actually applies. */
+@media (max-width:900px){
+  .hero-copy{justify-content:flex-start}
+  .hero-copy > :first-child,
+  .hero-copy > :last-child{flex:0 0 auto}
+  /* Keep the glass mark above the headline rather than behind it. */
+  .hero-full .logo-float{top:30%;height:21%}
+}

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { TopBanner, LandingNav } from "@/components/LandingNav";
 import { Hero } from "@/components/Hero";
 import { MarketRows } from "@/components/MarketsTable";
 import { FeatureScroll } from "@/components/FeatureScroll";
@@ -10,8 +9,7 @@ import { LANDING_ROWS } from "@/lib/mock";
 export default function HomePage() {
   return (
     <main id="main">
-      <TopBanner />
-      <LandingNav />
+      {/* The banner and nav now ride inside the hero, over the video. */}
       <Hero />
 
       <section className="sec" id="markets">

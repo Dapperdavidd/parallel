@@ -28,6 +28,14 @@ const TO = flags.find((f) => f.startsWith("--to="))?.slice(5);
 const PORT = 9223;
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
+// Never hang: a page with autoplaying video can keep Chrome busy, and a stuck
+// screenshot is worse than a missing one.
+const HARD_TIMEOUT_MS = 90_000;
+setTimeout(() => {
+  console.error("timed out waiting for Chrome");
+  process.exit(1);
+}, HARD_TIMEOUT_MS).unref();
+
 const chrome = spawn(CHROME, [
   "--headless=new",
   "--disable-gpu",
@@ -42,15 +50,22 @@ const cleanup = () => { try { chrome.kill(); } catch { /* gone */ } };
 process.on("exit", cleanup);
 
 let target;
-for (let i = 0; i < 40; i++) {
-  await sleep(300);
+let lastErr;
+for (let i = 0; i < 60; i++) {
+  await sleep(400);
   try {
     const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
     target = list.find((t) => t.type === "page");
     if (target?.webSocketDebuggerUrl) break;
-  } catch { /* not up */ }
+    lastErr = `no page target among ${list.length} targets`;
+  } catch (e) {
+    lastErr = e instanceof Error ? e.message : String(e);
+  }
 }
-if (!target) { console.error("could not reach Chrome"); process.exit(1); }
+if (!target) {
+  console.error(`could not reach Chrome on ${PORT}: ${lastErr}`);
+  process.exit(1);
+}
 
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener("open", r, { once: true }));
@@ -66,7 +81,7 @@ const send = (method, params = {}) =>
 
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", {
-  width: WIDTH, height: HEIGHT, deviceScaleFactor: 2, mobile: MOBILE,
+  width: WIDTH, height: HEIGHT, deviceScaleFactor: MOBILE ? 2 : 1, mobile: MOBILE,
 });
 await send("Page.navigate", { url: URL_ });
 await sleep(5500);
@@ -78,6 +93,14 @@ if (TO) {
   });
   await sleep(1800);
 }
+
+// Pause any playing video first. Chrome can sit waiting for a stable frame
+// otherwise, and captureScreenshot never returns. It also makes shots
+// deterministic, which matters when comparing before and after.
+await send("Runtime.evaluate", {
+  expression: `document.querySelectorAll("video").forEach(v=>{try{v.pause()}catch(e){}})`,
+});
+await sleep(400);
 
 const params = { format: "png", captureBeyondViewport: FULL };
 if (FULL) {

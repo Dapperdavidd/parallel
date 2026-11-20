@@ -1,130 +1,154 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { TopBanner, LandingNav } from "./LandingNav";
 
 /**
- * Hero: looping background video, the floating glass logo over it, headline
- * bottom-left.
+ * Full-bleed hero.
  *
- * The glass logo behaviour is specified in the design hand-off notes and is
- * implemented entirely in CSS (classes .logo-float / .logo-bob / .logo-shadow
- * / .logo-sweep, keyframes bob / shadow / sweep):
+ * The background video covers the entire viewport; the banner, nav, glass logo
+ * and headline all sit on top of it. The footage is bright daylight, so the
+ * scrim (.hero-scrim) does real work — without it white type on the sky is
+ * unreadable.
  *
- *   8-second cycle, matching the video so they feel in sync
- *   1. float   rises 5.4% of its own height by 4s, back down by 8s, eased
- *   2. tilt    −1.5deg at the top of the float
- *   3. shadow  shrinks to 82% and fades to 55% as it rises
- *   4. sweep   one soft highlight crosses the glass right-to-left, 5s → 6.2s,
- *              clipped to the logo's shape with a CSS mask of the same PNG
- *   5. reduced motion stops all of it
+ * The source has no audio track at all, so there is nothing to mute and no
+ * reason for a sound control. It is still marked `muted` because browsers
+ * refuse to autoplay otherwise.
  *
- * No JS animation loop and no canvas, so it stays cheap on a phone.
+ * The glass logo behaviour is unchanged and still pure CSS, per the design
+ * hand-off notes: an 8-second cycle matching the loop — float to 5.4% of its
+ * own height, −1.5deg tilt, shadow shrinking to 82% and fading to 55%, and one
+ * light sweep across the glass from 5s to 6.2s clipped to the logo's shape.
+ * All of it stops under prefers-reduced-motion.
  */
 export function Hero() {
-  const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [reduced, setReduced] = useState(false);
 
-  // Portrait source for tall screens, chosen once on mount. Doing this in an
-  // effect rather than markup keeps the server render identical for everyone.
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setReduced(true);
       v.removeAttribute("autoplay");
       v.pause();
       return;
     }
-    if (window.innerHeight > window.innerWidth) {
+
+    // Serve the lighter encode to small screens and to anyone on a metered
+    // connection. 2.7 MB instead of 7.1 MB, and at phone size it is
+    // indistinguishable.
+    type Conn = { saveData?: boolean; effectiveType?: string };
+    const conn = (navigator as Navigator & { connection?: Conn }).connection;
+    const light =
+      window.innerWidth <= 820 ||
+      conn?.saveData === true ||
+      (conn?.effectiveType ? /2g|3g/.test(conn.effectiveType) : false);
+
+    if (light) {
+      v.innerHTML = "";
       const s = document.createElement("source");
-      s.src = "/media/parallel-bg-portrait.mp4";
+      s.src = "/media/parallel-hero-720.mp4";
       s.type = "video/mp4";
-      v.prepend(s);
+      v.append(s);
       v.load();
-      void v.play().catch(() => {
-        /* autoplay can be refused; the poster still shows */
-      });
     }
+
+    void v.play().catch(() => {
+      /* autoplay can still be refused; the poster carries the frame */
+    });
   }, []);
 
-  // The hero shrinks and fades as it scrolls away.
+  // Gentle parallax: the video drifts and dims as the hero scrolls away.
   useEffect(() => {
+    if (reduced) return;
     const onScroll = (): void => {
-      const hc = cardRef.current;
-      if (!hc) return;
-      const r = hc.getBoundingClientRect();
-      const t = Math.min(1, Math.max(0, -r.top / (r.height * 0.9)));
-      hc.style.transform = `scale(${1 - t * 0.16})`;
-      hc.style.borderRadius = `${32 + t * 24}px`;
-      hc.style.opacity = `${1 - t * 0.6}`;
+      const v = videoRef.current;
+      if (!v) return;
+      const t = Math.min(1, Math.max(0, window.scrollY / window.innerHeight));
+      v.style.transform = `scale(${1 + t * 0.08}) translateY(${t * 4}%)`;
+      v.style.opacity = `${1 - t * 0.35}`;
     };
     addEventListener("scroll", onScroll, { passive: true });
     return () => removeEventListener("scroll", onScroll);
-  }, []);
+  }, [reduced]);
 
   return (
-    <section className="hero" aria-label="Hero">
-      <div className="hero-card" ref={cardRef}>
-        <video
-          ref={videoRef}
-          className="hero-video"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          poster="/media/parallel-bg-poster.jpg"
-        >
-          <source src="/media/parallel-bg-1080.webm" type="video/webm" />
-          <source src="/media/parallel-bg-1080.mp4" type="video/mp4" />
-        </video>
-        <div className="hero-video-shade" />
+    <section className="hero-full" aria-label="Hero">
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        poster="/media/parallel-hero-poster.jpg"
+        aria-hidden="true"
+      >
+        <source src="/media/parallel-hero-1080.webm" type="video/webm" />
+        <source src="/media/parallel-hero-1080.mp4" type="video/mp4" />
+      </video>
 
-        {/* Glass logo — spec in the comment above. */}
-        <div className="logo-float" aria-hidden="true">
-          <div className="logo-shadow" />
-          <div className="logo-bob">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/media/parallel-logo-glass.png" alt="" />
-            <div className="logo-sweep" />
-          </div>
+      <div className="hero-scrim" />
+
+      <div className="hero-chrome">
+        <TopBanner />
+        <LandingNav />
+      </div>
+
+      {/* Glass logo — floats over the video, behind the headline. */}
+      <div className="logo-float" aria-hidden="true">
+        <div className="logo-shadow" />
+        <div className="logo-bob">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/media/parallel-logo-glass.png" alt="" />
+          <div className="logo-sweep" />
+        </div>
+      </div>
+
+      <div className="hero-copy">
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 720 }}>
+          <span
+            className="pill-tag"
+            style={{
+              alignSelf: "flex-start",
+              border: "1px solid #F2A93B66",
+              background: "rgba(242,169,59,.14)",
+              color: "var(--amb)",
+              backdropFilter: "blur(6px)",
+            }}
+          >
+            Live on Solana devnet
+          </span>
+          <h1>
+            Trade the
+            <br />
+            parallel rate.
+          </h1>
         </div>
 
-        <div className="hero-bottom">
-          <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 720 }}>
-            <span
-              className="pill-tag"
-              style={{
-                alignSelf: "flex-start",
-                border: "1px solid #F2A93B55",
-                background: "#F2A93B14",
-                color: "var(--amb)",
-              }}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <p>
+            Long or short the dollar against the naira, the peso, the rupee and more. Priced
+            from the street rate people actually pay.
+          </p>
+          <div>
+            <Link
+              href="/app/trade"
+              className="btn btn-pri"
+              style={{ height: 54, padding: "0 34px", fontSize: 16 }}
             >
-              Live on Solana devnet
-            </span>
-            <h1>
-              Trade the
-              <br />
-              parallel rate.
-            </h1>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <p>
-              Long or short the dollar against the naira, the peso, the rupee and more.
-              Priced from the street rate people actually pay.
-            </p>
-            <div>
-              <Link
-                href="/app/trade"
-                className="btn btn-pri"
-                style={{ height: 54, padding: "0 34px", fontSize: 16 }}
-              >
-                Trade
-              </Link>
-            </div>
+              Trade
+            </Link>
           </div>
         </div>
+      </div>
+
+      <div className="hero-cue" aria-hidden="true">
+        <i />
+        SCROLL
       </div>
     </section>
   );
