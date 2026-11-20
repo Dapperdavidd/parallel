@@ -31,3 +31,11 @@ spike7/node_modules/
 spike7/dist/
 spike7/.env.local
 spike7/public/devnet.json
+
+# phase 2 web app
+web/node_modules/
+web/.next/
+web/.env.local
+
+# extracted design assets (regenerate with scripts/extract-design-assets.mjs)
+design-assets/
