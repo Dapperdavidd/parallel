@@ -495,9 +495,14 @@ export function buildMarketParams(opts: MarketParamOpts): InitMarketArgs {
     maxAccrualDtSlots: MAX_ACCRUAL_DT_SLOTS,
     maxAbsFundingE9PerSlot: opts.maxAbsFundingE9PerSlot ?? 0n,
     minFundingLifetimeSlots: 10_000_000n,
-    maxAccountBSettlementChunks: 1n,
-    maxBankruptCloseChunks: 1n,
-    maxBankruptCloseLifetimeSlots: 100n,
+    // Bankruptcy unwind capacity. The vaults deployment ships 1 / 1 / 100,
+    // which is too small: spike 4 drove an account bankrupt and the engine then
+    // could not make progress closing it (EngineNonProgress, 0x17) while
+    // bankruptcy_hlock_active stayed set. Upstream's own smoke suite uses
+    // 16 / 16 / 10_000_000, which unwinds. These are IMMUTABLE after InitMarket.
+    maxAccountBSettlementChunks: 16n,
+    maxBankruptCloseChunks: 16n,
+    maxBankruptCloseLifetimeSlots: 10_000_000n,
     publicBChunkAtoms: 1_000_000n,
     maintenanceFeePerSlot: 0n,
   };

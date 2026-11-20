@@ -113,9 +113,17 @@ async function liveUnitPriceUsd(): Promise<number> {
 async function main(): Promise<void> {
   const fresh = process.argv.includes("--fresh");
   const conn = getConnection();
-  const state = fresh
-    ? { network: "devnet" as const, percolatorProgram: PERCOLATOR_PROGRAM_ID.toBase58() }
-    : loadState();
+  // --fresh builds a new market (and therefore new portfolios, which are bound
+  // to a market) but keeps the collateral mint, which is market-independent and
+  // already holds balances.
+  const prior = loadState();
+  const state: State = fresh
+    ? {
+        network: "devnet",
+        percolatorProgram: PERCOLATOR_PROGRAM_ID.toBase58(),
+        collateralMint: prior.collateralMint,
+      }
+    : prior;
 
   console.log(`\n${DIM}Parallel — spike 1: create a Percolator market for the naira${OFF}`);
   console.log(`${DIM}${new Date().toISOString()} · program ${PERCOLATOR_PROGRAM_ID.toBase58()}${OFF}\n`);

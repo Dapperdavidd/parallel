@@ -18,7 +18,11 @@ const DIM = "\x1b[2m", OFF = "\x1b[0m";
 
 async function main(): Promise<void> {
   if (!existsSync(STATE_PATH)) throw new Error(`${STATE_PATH} not found — run \`npm run spike1\``);
-  const state = JSON.parse(readFileSync(STATE_PATH, "utf8")) as { market?: string };
+  const state = JSON.parse(readFileSync(STATE_PATH, "utf8")) as {
+    market?: string;
+    portfolioA?: string;
+    portfolioB?: string;
+  };
   if (!state.market) throw new Error("no market in state");
 
   const conn = getConnection();
@@ -31,6 +35,8 @@ async function main(): Promise<void> {
   const slot = await conn.getSlot("confirmed");
 
   const usd = (e6: bigint): string => `$${fromE6(e6).toFixed(6)}`;
+  const fmtAtoms = (a: bigint): string =>
+    (Number(a) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   console.log(`\nmarket ${market.toBase58()}`);
   console.log(`${DIM}account ${data.length} B · current slot ${slot}${OFF}\n`);
@@ -55,6 +61,47 @@ async function main(): Promise<void> {
   console.log("\ncontrol sequences");
   console.log(`  oracle_observation       ${seqs.oracleObservation}`);
   console.log(`  authority_epoch          ${seqs.authorityEpoch}`);
+
+  // Portfolios, if spikes 2-3 have created them.
+  const pfs: [string, string | undefined][] = [
+    ["A (admin) ", (state as { portfolioA?: string }).portfolioA],
+    ["B (trader)", (state as { portfolioB?: string }).portfolioB],
+  ];
+  const anyPf = pfs.some(([, k]) => k);
+  if (anyPf) {
+    const { parsePortfolio } = await import("../vendor/percolator-v16/index.js");
+    const { parseMarketGroup } = await import("../vendor/percolator-v16/index.js");
+    const group = parseMarketGroup(data);
+    console.log("\nmarket group");
+    console.log(`  mode                     ${group.mode} ${DIM}(0 = Live, 1 = Resolved, 2 = Recovery)${OFF}`);
+    console.log(`  vault / insurance        ${fmtAtoms(group.vault)} / ${fmtAtoms(group.insurance)}`);
+    console.log(`  c_tot                    ${fmtAtoms(group.cTot)}`);
+    console.log(`  loss_stale_active        ${group.lossStaleActive}`);
+    console.log(`  bankruptcy_hlock_active  ${group.bankruptcyHlockActive}`);
+    console.log(`  asset_slot_capacity      ${group.assetSlotCapacity} ${DIM}(layout drift check)${OFF}`);
+
+    console.log("\nportfolios");
+    for (const [name, key] of pfs) {
+      if (!key) continue;
+      const p = parsePortfolio(await getAccountData(conn, new PublicKey(key)));
+      const leg = p.legs.find((l) => l.assetIndex === 0);
+      const pos = leg?.basisPosQ ?? 0n;
+      const notional = (pos < 0n ? -pos : pos) * asset.effectivePrice / 1_000_000n;
+      const equity = p.capital + p.pnl;
+      console.log(
+        `  ${name} capital ${fmtAtoms(p.capital).padStart(14)}  pnl ${fmtAtoms(p.pnl).padStart(14)}  ` +
+          `equity ${fmtAtoms(equity).padStart(14)}`,
+      );
+      console.log(
+        `             pos ${pos.toString().padStart(14)}  notional ${fmtAtoms(notional).padStart(12)}  ` +
+          `${notional > 0n ? `equity/notional ${((Number(equity) / Number(notional)) * 100).toFixed(2)}%` : ""}`,
+      );
+      console.log(
+        `             ${DIM}stale ${p.staleState} bStale ${p.bStaleState} ` +
+          `rebalanceLock ${p.rebalanceLock} liquidationLock ${p.liquidationLock}${OFF}`,
+      );
+    }
+  }
 
   const lag = profile.oracleTargetPriceE6 !== asset.effectivePrice;
   console.log(
