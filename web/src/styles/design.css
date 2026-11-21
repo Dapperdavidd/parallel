@@ -499,3 +499,36 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
    footer's own bottom padding under it. */
 .wordmark{height:auto;padding:14px 0 0}
 .wordmark .wm{font-size:clamp(74px,15vw,210px)}
+
+/* ================= hero laid out to the reference ================= */
+/* Mark left; links and sign-in grouped right. */
+.lnav nav{justify-content:space-between}
+.nav-right{display:flex;align-items:center;gap:12px}
+@media (max-width:860px){.nav-right .navpill{display:none}}
+
+/* Copy sits along the BOTTOM: headline bottom-left, supporting line and the
+   buttons bottom-right. */
+.hero-copy{position:absolute;left:0;right:0;top:auto;bottom:0;transform:none;
+  z-index:4;display:flex;flex-direction:row;align-items:flex-end;justify-content:space-between;
+  gap:40px;padding:0 clamp(22px,4vw,64px) clamp(36px,6vh,64px);max-width:none;text-align:left}
+.hero-copy-left{display:flex;flex-direction:column;align-items:flex-start;gap:18px;min-width:0;flex:1 1 auto}
+.hero-copy-right{display:flex;flex-direction:column;gap:18px;flex:0 1 430px;min-width:0}
+.hero-copy h1{font-size:clamp(34px,5.4vw,86px);line-height:1.02;letter-spacing:-.045em;margin:0;
+  text-shadow:0 2px 36px rgba(0,0,0,.6),0 1px 4px rgba(0,0,0,.45)}
+.hero-copy p{margin:0;font-size:clamp(15px,1.15vw,17px);line-height:1.6;color:#E6E6E9;
+  max-width:420px;text-shadow:0 1px 18px rgba(0,0,0,.75)}
+
+/* A soft pool behind the bottom copy only — not a full-width curtain over the
+   footage, just enough to hold the type. */
+.hero-full::after{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;z-index:2;
+  pointer-events:none;background:linear-gradient(0deg,rgba(11,11,12,.86),rgba(11,11,12,.30) 46%,rgba(11,11,12,0))}
+
+/* The glass mark, bigger and centred like the reference object. */
+.hero-full .logo-float{left:50%;top:44%;height:58%;z-index:3}
+.logo-bob img{filter:drop-shadow(0 26px 60px rgba(0,0,0,.55)) drop-shadow(0 2px 10px rgba(255,255,255,.08))}
+
+@media (max-width:900px){
+  .hero-copy{flex-direction:column;align-items:flex-start;gap:20px;padding:0 22px 40px}
+  .hero-copy-right{flex:0 0 auto}
+  .hero-full .logo-float{left:50%;top:26%;height:24%}
+}

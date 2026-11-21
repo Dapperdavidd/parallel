@@ -76,12 +76,16 @@ export function Hero() {
 
       // Shrink toward the width of the content column below, and round off,
       // so the video reads as becoming that section's frame.
-      stage.style.transform = `scale(${1 - ease * 0.38})`;
-      stage.style.borderRadius = `${ease * 34}px`;
-      stage.style.opacity = `${1 - ease * 0.15}`;
+      // Shrink to roughly the width of the card in the section below, round
+      // off, then hand over: the last stretch fades the stage out so the next
+      // section's card appears to be what the video became.
+      stage.style.transform = `scale(${1 - ease * 0.14})`;
+      stage.style.borderRadius = `${ease * 30}px`;
+      const handoff = Math.max(0, (ease - 0.72) / 0.28);
+      stage.style.opacity = `${1 - handoff}`;
 
       const copy = stage.querySelector<HTMLElement>(".hero-copy");
-      if (copy) copy.style.opacity = `${1 - Math.min(1, ease * 2.2)}`;
+      if (copy) copy.style.opacity = `${1 - Math.min(1, ease * 2.6)}`;
     };
     const onScroll = (): void => {
       if (!raf) raf = requestAnimationFrame(apply);
@@ -125,34 +129,35 @@ export function Hero() {
         </div>
 
         <div className="hero-copy">
-          <span
-            className="pill-tag"
-            style={{
-              alignSelf: "flex-start",
-              border: "1px solid #F2A93B66",
-              background: "rgba(242,169,59,.16)",
-              color: "var(--amb)",
-              backdropFilter: "blur(6px)",
-            }}
-          >
-            Live on Solana devnet
-          </span>
-
-          <h1>Trade the parallel rate.</h1>
-
-          <p>
-            Long or short the dollar against the naira, the peso, the rupee and more. Priced
-            from the street rate people actually pay.
-          </p>
-
-          <div>
-            <Link
-              href="/app/trade"
-              className="btn btn-pri"
-              style={{ height: 54, padding: "0 34px", fontSize: 16 }}
+          <div className="hero-copy-left">
+            <span
+              className="pill-tag"
+              style={{
+                alignSelf: "flex-start",
+                border: "1px solid #F2A93B66",
+                background: "rgba(242,169,59,.16)",
+                color: "var(--amb)",
+                backdropFilter: "blur(6px)",
+              }}
             >
-              Trade
-            </Link>
+              Live on Solana devnet
+            </span>
+            <h1>Trade the parallel rate.</h1>
+          </div>
+
+          <div className="hero-copy-right">
+            <p>
+              Long or short the dollar against the naira, the peso, the rupee and more.
+              Priced from the street rate people actually pay.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Link href="/app/trade" className="btn btn-light" style={{ height: 50, padding: "0 26px" }}>
+                Start trading
+              </Link>
+              <Link href="/#markets" className="btn btn-glass" style={{ height: 50, padding: "0 22px" }}>
+                See markets ↓
+              </Link>
+            </div>
           </div>
         </div>
       </div>

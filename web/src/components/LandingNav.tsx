@@ -11,26 +11,28 @@ export function TopBanner() {
 }
 
 /**
- * Landing nav.
+ * Landing nav, laid out to the reference: mark on the left, then the links and
+ * the sign-in button grouped together on the right.
  *
- * "Trade" and "Hedge" stay ON the landing page — they jump to the part of the
- * feature sequence that explains each one, rather than dropping a first-time
- * visitor straight into the app. Only the sign-in button leads out.
+ * "Trade" and "Hedge" stay ON the landing page — they jump to the step of the
+ * feature sequence that explains each one. Only sign-in leads out.
  */
 export function LandingNav() {
   return (
     <header className="lnav">
       <nav aria-label="Main">
         <Brand />
-        <div className="navpill">
-          <Link href="/#markets">Markets</Link>
-          <Link href="/#features">Product</Link>
-          <Link href="/#feature-trade">Trade</Link>
-          <Link href="/#feature-hedge">Hedge</Link>
+        <div className="nav-right">
+          <div className="navpill">
+            <Link href="/#markets">Markets</Link>
+            <Link href="/#features">Product</Link>
+            <Link href="/#feature-trade">Trade</Link>
+            <Link href="/#feature-hedge">Hedge</Link>
+          </div>
+          <Link href="/signin" className="btn btn-light" style={{ height: 44 }}>
+            Sign in / Sign up
+          </Link>
         </div>
-        <Link href="/signin" className="btn btn-glass" style={{ height: 44 }}>
-          Sign in / Sign up
-        </Link>
       </nav>
     </header>
   );
