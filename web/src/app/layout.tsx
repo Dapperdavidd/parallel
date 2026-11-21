@@ -4,6 +4,7 @@ import "@/styles/design.css";
 import { DemoProvider } from "@/lib/store";
 import { ToastProvider } from "@/components/Toast";
 import { LiveProvider } from "@/lib/live";
+import { WalletProvider } from "@/lib/privy";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -39,15 +40,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="sr-only">
           Skip to content
         </a>
-        {/* One demo store for the whole site, so signing in on /signin is still
-            in effect when the user lands in /app. Phase 3 swaps this for Privy. */}
+        {/* One store for the whole site keeps Privy auth and the local position
+            view in sync as the user moves between sign-in and the app. */}
         {/* LiveProvider lays the real index over the sample data, so every
             screen shows live prices without having been rebuilt. */}
-        <DemoProvider>
-          <LiveProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </LiveProvider>
-        </DemoProvider>
+        <WalletProvider>
+          <DemoProvider>
+            <LiveProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </LiveProvider>
+          </DemoProvider>
+        </WalletProvider>
       </body>
     </html>
   );

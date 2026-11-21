@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { latestTicks, listMarkets, recentTicks } from "@/lib/server/data";
+import { latestTicks, listMarkets, recentTicks, registryMeta } from "@/lib/server/data";
 
 /**
  * F7 — the market board, from the live index.
@@ -35,6 +35,7 @@ export interface LiveMarket {
   change24hPct: number | null;
   lastPushTx: string | null;
   marketAccount: string;
+  collateralVault: string;
 }
 
 /**
@@ -62,7 +63,7 @@ function change24h(
 }
 
 export async function GET(): Promise<NextResponse> {
-  const [markets, ticks] = await Promise.all([listMarkets(), latestTicks()]);
+  const [markets, ticks, meta] = await Promise.all([listMarkets(), latestTicks(), registryMeta()]);
 
   const histories = await Promise.all(
     markets.map((m) => recentTicks(m.id, 900).catch(() => [])),
@@ -87,11 +88,12 @@ export async function GET(): Promise<NextResponse> {
       change24hPct: change24h(histories[i] ?? [], t?.median ?? null),
       lastPushTx: t?.pushedTx ?? null,
       marketAccount: m.market,
+      collateralVault: m.vault,
     };
   });
 
   return NextResponse.json(
-    { markets: rows, at: new Date().toISOString() },
+    { markets: rows, collateralMint: meta?.collateralMint ?? null, at: new Date().toISOString() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

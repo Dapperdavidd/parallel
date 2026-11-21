@@ -42,8 +42,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             type="button"
             className="btn btn-add"
             onClick={() => {
-              const amount = topUp();
-              toast(`Added ${fmt(amount)} tUSDC from the devnet faucet`);
+              void topUp()
+                .then((amount) => toast(amount > 0 ? `Added ${fmt(amount)} tUSDC from the devnet faucet` : "Devnet balance is already funded"))
+                .catch((error: unknown) => toast(error instanceof Error ? error.message : "Devnet funding failed"));
             }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">

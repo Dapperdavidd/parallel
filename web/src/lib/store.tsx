@@ -1,17 +1,8 @@
 "use client";
 
 /**
- * Phase 2 demo state.
- *
- * Everything here is pretend: there is no wallet, no chain call and no
- * database. Positions live in sessionStorage so a reviewer can click through
- * the whole flow, refresh, and still see their trades — but a new tab starts
- * clean.
- *
- * Phase 3 replaces this provider with real Privy auth, real Percolator reads
- * and Supabase history. The component API is deliberately the shape we will
- * want then (`signIn`, `openPosition`, `closePosition`), so screens do not
- * need redesigning.
+ * Privy authentication and opening trades use devnet. The position list and
+ * close-position flow remain local until the next trading tranche lands.
  */
 
 import {
@@ -22,11 +13,11 @@ import {
   useMemo,
   useState,
 } from "react";
+import { usePrivy } from "@privy-io/react-auth";
+import { useWallets } from "@privy-io/react-auth/solana";
 import {
   byCode,
   positionPnl,
-  DEVNET_TOPUP,
-  STARTING_BALANCE,
   TRADING_FEE_BPS,
   type Position,
 } from "./mock";
@@ -42,7 +33,7 @@ interface DemoState {
 const INITIAL: DemoState = {
   signedIn: false,
   user: "",
-  balance: STARTING_BALANCE,
+  balance: 0,
   positions: [],
   market: "NGN",
 };
@@ -51,20 +42,23 @@ interface Store extends DemoState {
   ready: boolean;
   openPnl: number;
   setMarket: (c: string) => void;
-  signIn: (user: string) => void;
+  signIn: (user?: string) => void;
   signOut: () => void;
   openPosition: (p: Omit<Position, "id">) => void;
   closePosition: (id: number) => number;
   /** Request the devnet faucet minimum. */
-  topUp: () => number;
+  topUp: () => Promise<number>;
 }
 
 const Ctx = createContext<Store | null>(null);
 const KEY = "parallel.demo";
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {
+  const { ready: authReady, authenticated, login, logout, user: privyUser } = usePrivy();
+  const { wallets } = useWallets();
   const [s, setS] = useState<DemoState>(INITIAL);
-  const [ready, setReady] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const walletAddress = wallets[0]?.address ?? "";
 
   // Hydrate after mount so the server and first client render match.
   useEffect(() => {
@@ -74,27 +68,46 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* ignore corrupt state */
     }
-    setReady(true);
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!hydrated) return;
     try {
       sessionStorage.setItem(KEY, JSON.stringify(s));
     } catch {
       /* storage can be unavailable in private mode */
     }
-  }, [s, ready]);
+  }, [s, hydrated]);
 
   const setMarket = useCallback((market: string) => setS((p) => ({ ...p, market })), []);
 
-  const signIn = useCallback(
-    (user: string) =>
-      setS((p) => ({ ...p, signedIn: true, user, balance: STARTING_BALANCE, market: "NGN" })),
-    [],
-  );
+  const signIn = useCallback(() => void login(), [login]);
 
-  const signOut = useCallback(() => setS(() => ({ ...INITIAL })), []);
+  const signOut = useCallback(() => {
+    void logout();
+    setS(() => ({ ...INITIAL }));
+  }, [logout]);
+
+  const fundWallet = useCallback(async (): Promise<number> => {
+    if (!walletAddress) return 0;
+    const response = await fetch("/api/faucet", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wallet: walletAddress }),
+    });
+    const body = (await response.json()) as { balance?: number; added?: number; error?: string };
+    if (!response.ok || body.balance === undefined) {
+      throw new Error(body.error ?? "Devnet funding failed");
+    }
+    setS((p) => ({ ...p, balance: body.balance ?? p.balance }));
+    return body.added ?? 0;
+  }, [walletAddress]);
+
+  useEffect(() => {
+    if (!authReady || !authenticated || !walletAddress) return;
+    void fundWallet().catch(() => undefined);
+  }, [authReady, authenticated, walletAddress, fundWallet]);
 
   const openPosition = useCallback((p: Omit<Position, "id">) => {
     setS((prev) => {
@@ -122,23 +135,33 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     return realised;
   }, []);
 
-  /**
-   * Add money: on devnet this is a faucet request, not a deposit of anything
-   * real. Phase 3 calls the mint authority; here it just credits the balance.
-   */
-  const topUp = useCallback((): number => {
-    setS((p) => ({ ...p, balance: p.balance + DEVNET_TOPUP }));
-    return DEVNET_TOPUP;
-  }, []);
+  /** Add money through the idempotent devnet faucet. */
+  const topUp = useCallback(async (): Promise<number> => fundWallet(), [fundWallet]);
 
   const openPnl = useMemo(
     () => s.positions.reduce((a, p) => a + positionPnl(p), 0),
     [s.positions],
   );
 
+  const ready = hydrated && authReady;
+  const displayUser =
+    privyUser?.email?.address?.split("@")[0] ??
+    (walletAddress ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}` : "trader");
   const value = useMemo<Store>(
-    () => ({ ...s, ready, openPnl, setMarket, signIn, signOut, openPosition, closePosition, topUp }),
-    [s, ready, openPnl, setMarket, signIn, signOut, openPosition, closePosition, topUp],
+    () => ({
+      ...s,
+      ready,
+      signedIn: authenticated,
+      user: displayUser,
+      openPnl,
+      setMarket,
+      signIn,
+      signOut,
+      openPosition,
+      closePosition,
+      topUp,
+    }),
+    [s, ready, authenticated, displayUser, openPnl, setMarket, signIn, signOut, openPosition, closePosition, topUp],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

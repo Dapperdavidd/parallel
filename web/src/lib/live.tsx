@@ -46,6 +46,7 @@ export interface LiveMarket {
   change24hPct: number | null;
   lastPushTx: string | null;
   marketAccount: string;
+  collateralVault: string;
 }
 
 interface LiveState {

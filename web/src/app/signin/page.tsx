@@ -13,10 +13,8 @@ import { DEMO_WALLET, fmt, STARTING_BALANCE } from "@/lib/mock";
  * does not choose. We look for a wallet linked to the login; if there is none,
  * we make one.
  *
- * PHASE 2 — this is all pretend. No email is sent, any 6 digits pass, and no
- * wallet exists. Phase 3 replaces the body of each step with Privy, which
- * spike 7 already proved can create a Solana wallet from an email sign-in and
- * sign Percolator instructions with it.
+ * Privy owns the verification modal and creates an embedded Solana wallet for
+ * a new email. The surrounding screen stays the approved design.
  */
 type Step = "start" | "code" | "checking" | "created" | "name" | "welcome";
 
@@ -50,13 +48,17 @@ function Check({ children, delay }: { children: React.ReactNode; delay: number }
 
 export default function SignInPage() {
   const router = useRouter();
-  const { signIn } = useDemo();
+  const { signIn, signedIn, ready } = useDemo();
   const toast = useToast();
 
   const [step, setStep] = useState<Step>("start");
   const [demo, setDemo] = useState<"new" | "old">("new");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+
+  useEffect(() => {
+    if (ready && signedIn) router.replace("/app/trade");
+  }, [ready, signedIn, router]);
 
   // "Looking for a wallet linked to this login."
   useEffect(() => {
@@ -136,7 +138,7 @@ export default function SignInPage() {
                   before? We open your existing wallet.
                 </p>
               </div>
-              <button className="gbtn" type="button" onClick={() => setStep("checking")}>
+              <button className="gbtn" type="button" onClick={() => signIn()} style={{ display: "none" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"
@@ -159,7 +161,7 @@ export default function SignInPage() {
                 style={{ display: "flex", flexDirection: "column", gap: 12 }}
                 onSubmit={(e) => {
                   e.preventDefault();
-                  setStep("code");
+                  signIn(email);
                 }}
               >
                 <label htmlFor="em">Email</label>

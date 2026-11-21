@@ -11,6 +11,7 @@ import {
 } from "@/lib/mock";
 import { useDemo } from "@/lib/store";
 import { useToast } from "@/components/Toast";
+import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
 
 const PRESETS = [100, 500, 1000, 2500];
 
@@ -18,10 +19,12 @@ export function TradeTicket({ market }: { market: Market }) {
   const { signedIn, balance, openPosition } = useDemo();
   const toast = useToast();
   const router = useRouter();
+  const trading = usePercolatorTrade();
 
   const [side, setSide] = useState<"long" | "short">("long");
   const [size, setSize] = useState(500);
   const [lev, setLev] = useState(2);
+  const [busy, setBusy] = useState(false);
 
   // Leverage is capped per market and the cap is fixed on-chain at creation,
   // so clamp rather than silently allowing an impossible position.
@@ -34,7 +37,7 @@ export function TradeTicket({ market }: { market: Market }) {
   const liq = liquidationPrice(market, side, lev);
   const weakens = market.name.split(" ").slice(1).join(" ") || market.name;
 
-  const place = (): void => {
+  const place = async (): Promise<void> => {
     if (!signedIn) {
       router.push("/signin");
       return;
@@ -47,8 +50,16 @@ export function TradeTicket({ market }: { market: Market }) {
       toast("Not enough tUSDC");
       return;
     }
-    openPosition({ c: market.c, side, size, lev, entry: market.px });
-    toast(`${side === "long" ? "Long" : "Short"} USD/${market.c} ${lev}x opened · settled on devnet`);
+    setBusy(true);
+    try {
+      const signature = await trading.open({ code: market.c, side, marginUsdc: size, leverage: lev });
+      openPosition({ c: market.c, side, size, lev, entry: market.px });
+      toast(`${side === "long" ? "Long" : "Short"} USD/${market.c} ${lev}x opened · ${signature.slice(0, 8)}…`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Trade failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -131,7 +142,8 @@ export function TradeTicket({ market }: { market: Market }) {
       <button
         type="button"
         className="btn"
-        onClick={place}
+        onClick={() => void place()}
+        disabled={busy}
         style={{
           height: 52,
           marginTop: 6,
@@ -139,7 +151,7 @@ export function TradeTicket({ market }: { market: Market }) {
           color: side === "long" ? "#06150E" : "#fff",
         }}
       >
-        {signedIn ? (side === "long" ? "Open long" : "Open short") : "Sign in / Sign up to trade"}
+        {busy ? "Waiting for wallet…" : signedIn ? (side === "long" ? "Open long" : "Open short") : "Sign in / Sign up to trade"}
       </button>
 
       <div className="card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>

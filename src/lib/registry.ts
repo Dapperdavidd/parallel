@@ -27,6 +27,15 @@ export interface RegistryEntry {
   authMarkWire: AuthMarkWire;
   initialPriceE6: string;
   createdAt: string;
+  /** Parallel's isolated counterparty portfolio for this market. */
+  liquidityVault?: {
+    authority: string;
+    portfolio: string;
+    capitalAtoms: string;
+    maxNotionalUsdc: number;
+    maxOpenInterestUsdc: number;
+    createdAt: string;
+  };
 }
 
 export interface Registry {

@@ -7,7 +7,6 @@ import {
   ACCOUNT_TRADES,
   ACCOUNT_VOLUME,
   DEMO_WALLET,
-  DEVNET_TOPUP,
   EQUITY_RANGES,
   STARTING_BALANCE,
   accountStats,
@@ -124,10 +123,11 @@ export default function PortfolioPage() {
           <Action
             label="Add money"
             primary
-            hint={`Adds ${fmt(DEVNET_TOPUP, 0)} test USDC to your wallet. Devnet only — it is not real money.`}
+            hint={`Restores your wallet to ${fmt(STARTING_BALANCE, 0)} test USDC. Devnet only — it is not real money.`}
             onClick={() => {
-              const amount = topUp();
-              toast(`Added ${fmt(amount, 0)} tUSDC from the devnet faucet`);
+              void topUp()
+                .then((amount) => toast(amount > 0 ? `Added ${fmt(amount, 0)} tUSDC from the devnet faucet` : "Devnet balance is already funded"))
+                .catch((error: unknown) => toast(error instanceof Error ? error.message : "Devnet funding failed"));
             }}
           />
           <Action

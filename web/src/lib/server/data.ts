@@ -32,6 +32,13 @@ export interface MarketInfo {
   market: string;
   vault: string;
   assetIndex: number;
+  liquidityVault?: {
+    authority: string;
+    portfolio: string;
+    capitalAtoms: string;
+    maxNotionalUsdc: number;
+    maxOpenInterestUsdc: number;
+  };
 }
 
 export interface SourceReading {
@@ -121,26 +128,31 @@ const candleFile = (id: string): string => join(DATA_DIR, "candles", `${id.repla
 // ------------------------------------------------------------------ markets --
 
 export async function listMarkets(): Promise<MarketInfo[]> {
+  const registry = await readJson<{ markets: MarketInfo[] }>(REGISTRY, { markets: [] });
+  const registryById = new Map(registry.markets.map((market) => [market.id, market]));
   const client = db();
   if (client) {
     const { data } = await client.from("markets").select("*").order("id");
     if (data && data.length > 0) {
-      return data.map((m) => ({
-        id: m.id,
-        currency: m.currency,
-        unit: m.unit,
-        unitLabel: m.unit_label,
-        status: m.status,
-        maxLeverage: m.max_leverage,
-        market: m.slab_pubkey ?? "",
-        vault: m.vault_pubkey ?? "",
-        assetIndex: 0,
-      }));
+      return data.map((m) => {
+        const local = registryById.get(m.id);
+        return {
+          id: m.id,
+          currency: m.currency,
+          unit: m.unit,
+          unitLabel: m.unit_label,
+          status: m.status,
+          maxLeverage: m.max_leverage,
+          market: m.slab_pubkey ?? local?.market ?? "",
+          vault: m.vault_pubkey ?? local?.vault ?? "",
+          assetIndex: local?.assetIndex ?? 0,
+          liquidityVault: local?.liquidityVault,
+        };
+      });
     }
   }
 
-  const reg = await readJson<{ markets: MarketInfo[] }>(REGISTRY, { markets: [] });
-  return reg.markets;
+  return registry.markets;
 }
 
 /** The devnet addresses, for the index page and the docs. */

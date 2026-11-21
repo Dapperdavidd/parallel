@@ -22,6 +22,7 @@
     "index": "tsx src/services/index-service.ts",
     "balances": "tsx src/tools/balances.ts",
     "markets:create": "tsx src/services/create-markets.ts",
+    "vaults:create": "tsx src/services/create-liquidity-vaults.ts",
     "keeper": "tsx src/services/keeper.ts",
     "backfill": "tsx src/services/backfill-official.ts"
   },
