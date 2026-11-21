@@ -17,7 +17,7 @@
  *   npm run markets:create -- --dry-run    # price and cost, no transactions
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import {
   Keypair,
   PublicKey,
@@ -55,43 +55,16 @@ import { LAUNCH_MARKETS, getMarket, type MarketDef } from "../lib/markets.js";
 import { fetchOfficialRates, readSource, sourcesFor } from "../lib/sources.js";
 import { computeIndex } from "../lib/index-math.js";
 import { openStore, type MarketRow } from "../lib/store/index.js";
+import {
+  loadRegistry,
+  saveRegistry,
+  REGISTRY_PATH,
+  type Registry,
+  type RegistryEntry,
+} from "../lib/registry.js";
 
-const DIM = "\x1b[2m", OFF = "\x1b[0m", GREEN = "\x1b[32m", RED = "\x1b[31m", YELLOW = "\x1b[33m";
-
-/** Committed, so the app and keeper can find the markets without a database. */
-export const REGISTRY_PATH = "market-registry.json";
 const SPIKE_STATE = "out/parallel-devnet.json";
-
-export interface RegistryEntry {
-  id: string;
-  currency: string;
-  unit: number;
-  unitLabel: string;
-  status: string;
-  maxLeverage: number;
-  market: string;
-  vault: string;
-  assetIndex: number;
-  authMarkWire: AuthMarkWire;
-  initialPriceE6: string;
-  createdAt: string;
-}
-
-export interface Registry {
-  network: "devnet";
-  percolatorProgram: string;
-  collateralMint: string;
-  oracleAuthority: string;
-  markets: RegistryEntry[];
-}
-
-export function loadRegistry(): Registry | null {
-  if (!existsSync(REGISTRY_PATH)) return null;
-  return JSON.parse(readFileSync(REGISTRY_PATH, "utf8")) as Registry;
-}
-
-const saveRegistry = (r: Registry): void =>
-  writeFileSync(REGISTRY_PATH, `${JSON.stringify(r, null, 2)}\n`);
+const DIM = "\x1b[2m", OFF = "\x1b[0m", GREEN = "\x1b[32m", RED = "\x1b[31m", YELLOW = "\x1b[33m";
 
 const toE6 = (usd: number): bigint => BigInt(Math.round(usd * 1_000_000));
 
@@ -343,8 +316,13 @@ async function main(): Promise<void> {
   if (registry.markets.length < LAUNCH_MARKETS.length) process.exitCode = 1;
 }
 
-mkdirSync("out", { recursive: true });
-main().catch((err) => {
-  console.error("create-markets failed:", err);
-  process.exit(1);
-});
+// Only when run directly. Importing this module must never create markets.
+const invokedDirectly =
+  process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "");
+if (invokedDirectly) {
+  mkdirSync("out", { recursive: true });
+  main().catch((err) => {
+    console.error("create-markets failed:", err);
+    process.exit(1);
+  });
+}

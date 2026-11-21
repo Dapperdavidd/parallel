@@ -76,26 +76,41 @@ export const lookup = (
     return callback(null, first.address as never, first.family as never);
   }
 
+  // The whole body is guarded: `callback` runs Node's connect path, which can
+  // throw synchronously (ENETUNREACH, for one). Inside a floating promise that
+  // would surface as an unhandled rejection and take the process down — a
+  // resolver must never be able to kill the keeper.
   void (async () => {
-    for (const server of RESOLVERS) {
-      try {
-        const addrs = await resolveWith(server, hostname);
-        if (addrs.length === 0) continue;
-        const entry: CacheEntry = {
-          addresses: addrs.map((address) => ({ address, family: 4 })),
-          at: Date.now(),
-        };
-        cache.set(hostname, entry);
+    try {
+      for (const server of RESOLVERS) {
+        let entry: CacheEntry;
+        try {
+          const addrs = await resolveWith(server, hostname);
+          if (addrs.length === 0) continue;
+          entry = {
+            addresses: addrs.map((address) => ({ address, family: 4 })),
+            at: Date.now(),
+          };
+          cache.set(hostname, entry);
+        } catch {
+          continue; // try the next resolver
+        }
         if (options.all) return callback(null, entry.addresses as never);
         const first = entry.addresses[0]!;
         return callback(null, first.address as never, first.family as never);
+      }
+      // Everything public failed — the box may be behind a resolver-only
+      // network. Let the OS try; it knows about split horizons.
+      systemLookup(hostname, options as never, callback as never);
+    } catch (err) {
+      // Hand the failure back through the callback rather than throwing into
+      // the void, so the caller sees a failed request and the market pauses.
+      try {
+        callback(err as NodeJS.ErrnoException, "" as never);
       } catch {
-        /* try the next resolver */
+        /* the consumer already gave up */
       }
     }
-    // Everything public failed — the box may be behind a resolver-only
-    // network. Let the OS try; it is the one that knows about split horizons.
-    systemLookup(hostname, options as never, callback as never);
   })();
 };
 

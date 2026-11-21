@@ -21,7 +21,8 @@
     "spike7:verify": "tsx src/spikes/spike7-verify.ts",
     "index": "tsx src/services/index-service.ts",
     "balances": "tsx src/tools/balances.ts",
-    "markets:create": "tsx src/services/create-markets.ts"
+    "markets:create": "tsx src/services/create-markets.ts",
+    "keeper": "tsx src/services/keeper.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",

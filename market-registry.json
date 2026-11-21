@@ -129,6 +129,62 @@
       "authMarkWire": "short",
       "initialPriceE6": "1563172",
       "createdAt": "2026-11-21T21:16:09.215Z"
+    },
+    {
+      "id": "USD/KES",
+      "currency": "KES",
+      "unit": 100,
+      "unitLabel": "100KES",
+      "status": "beta",
+      "maxLeverage": 2,
+      "market": "V78RmgNyhj3G8FJPLc6PodJgTdxZqxFqFw5FkcuovSk",
+      "vault": "B3VVka1xS4ZU1ntcBy7D2nb9nYykWM5fRhJNH6m2hAkQ",
+      "assetIndex": 0,
+      "authMarkWire": "short",
+      "initialPriceE6": "759734",
+      "createdAt": "2026-11-21T21:36:02.498Z"
+    },
+    {
+      "id": "USD/GHS",
+      "currency": "GHS",
+      "unit": 10,
+      "unitLabel": "10GHS",
+      "status": "beta",
+      "maxLeverage": 2,
+      "market": "4aEYCWuLyo9NVGvem36H4ktfyP9RrugyTbWr1ih35mn8",
+      "vault": "AstL8qDkXSugmniBTrqTdJ6LqyjZJTpfjasCGDJwa53y",
+      "assetIndex": 0,
+      "authMarkWire": "short",
+      "initialPriceE6": "805477",
+      "createdAt": "2026-11-21T21:36:05.727Z"
+    },
+    {
+      "id": "USD/EGP",
+      "currency": "EGP",
+      "unit": 100,
+      "unitLabel": "100EGP",
+      "status": "beta",
+      "maxLeverage": 2,
+      "market": "3SUbg6FW1c4sVP9pXcMfRyUZtCGrYYm1mXyKAhjWFfGh",
+      "vault": "aJgWpcoSwBxwARbK3a7mZUpJi5yHFLHQDgypHEpJbYn",
+      "assetIndex": 0,
+      "authMarkWire": "short",
+      "initialPriceE6": "1801315",
+      "createdAt": "2026-11-21T21:36:09.131Z"
+    },
+    {
+      "id": "USD/PKR",
+      "currency": "PKR",
+      "unit": 100,
+      "unitLabel": "100PKR",
+      "status": "beta",
+      "maxLeverage": 2,
+      "market": "82ydgrfQLpesGHbdMXW7pEV5jQpJMBGUUwbn298ss14Y",
+      "vault": "F22btpXbJYcoZuuAK4SDTFpG7VkbQXKXTqfKsNEEJfKC",
+      "assetIndex": 0,
+      "authMarkWire": "short",
+      "initialPriceE6": "343448",
+      "createdAt": "2026-11-21T21:36:12.084Z"
     }
   ]
 }
