@@ -187,7 +187,7 @@ export function IntroStage() {
                   <Link href="/app/trade" className="btn btn-light" style={{ height: 50, padding: "0 26px" }}>
                     Start trading
                   </Link>
-                  <Link href="/learn" className="btn btn-glass" style={{ height: 50, padding: "0 22px" }}>
+                  <Link href="/docs" className="btn btn-glass" style={{ height: 50, padding: "0 22px" }}>
                     How it works
                   </Link>
                 </div>

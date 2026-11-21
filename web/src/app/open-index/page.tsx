@@ -48,7 +48,7 @@ export default function IndexPage() {
             sources or it pauses. The median is pushed on-chain when it moves more than 0.1%
             or ten minutes pass — last push{" "}
             <b>{LAST_PUSH_SECONDS_AGO} seconds ago</b>.{" "}
-            <Link href="/learn#prices" className="doc-link">
+            <Link href="/docs/prices" className="doc-link">
               Read the full method →
             </Link>
           </div>

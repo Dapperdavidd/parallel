@@ -108,6 +108,15 @@ if (SCROLL) {
   await sleep(1600);
 }
 
+// --click=<selector> clicks something before the shot, for menus and popovers.
+const CLICK = flags.find((f) => f.startsWith("--click="))?.slice(8);
+if (CLICK) {
+  await send("Runtime.evaluate", {
+    expression: `document.querySelector(${JSON.stringify(CLICK)})?.click()`,
+  });
+  await sleep(700);
+}
+
 if (TO) {
   await send("Runtime.evaluate", {
     expression: `(()=>{const e=document.querySelector(${JSON.stringify(TO)});

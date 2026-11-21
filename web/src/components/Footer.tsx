@@ -47,18 +47,19 @@ export function Footer() {
             <Link href="/app/hedge">Hedge mode</Link>
           </div>
           <div>
-            <h4>Learn</h4>
-            <Link href="/learn#prices">How prices work</Link>
-            <Link href="/learn#trading">How trading works</Link>
-            <Link href="/learn#hedging">How hedging works</Link>
-            <Link href="/learn#app">The app</Link>
-            <Link href="/learn#faq">Questions</Link>
+            <h4>Docs</h4>
+            <Link href="/docs">Start here</Link>
+            <Link href="/docs/prices">How prices work</Link>
+            <Link href="/docs/trading">How trading works</Link>
+            <Link href="/docs/hedging">How hedging works</Link>
+            <Link href="/docs/faq">Questions</Link>
+            <Link href="/docs/api">API documentation</Link>
           </div>
           <div>
             <h4>Parallel</h4>
-            <Link href="/learn#about">About</Link>
+            <Link href="/docs/about">About</Link>
             <Link href="/open-index">Open index</Link>
-            <Link href="/learn#risks">Risk disclosure</Link>
+            <Link href="/docs/risks">Risk disclosure</Link>
             <Link href="/signin">Sign in / Sign up</Link>
           </div>
         </div>
@@ -79,7 +80,7 @@ export function Footer() {
             <span style={{ fontSize: 14, color: "var(--ink2)" }}>Every source, published</span>
           </span>
         </Link>
-        <Link href="/learn#risks" className="tile">
+        <Link href="/docs/risks" className="tile">
           <TileIcon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#A1A1A6" />
           <span>
             <b style={{ display: "block", fontWeight: 500 }}>Devnet only</b>
@@ -103,7 +104,7 @@ export function Footer() {
       >
         <span>© 2026 Parallel</span>
         <span style={{ display: "flex", gap: 20 }}>
-          <Link href="/learn#risks">Risk</Link>
+          <Link href="/docs/risks">Risk</Link>
           <Link href="/app/markets">Markets</Link>
           <Link href="/signin">Sign in</Link>
         </span>
