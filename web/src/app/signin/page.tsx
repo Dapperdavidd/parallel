@@ -97,7 +97,7 @@ export default function SignInPage() {
           }}
         />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/media/parallel-logo-glass.png" alt="" />
+        <img src="/media/parallel-logo-thick-glass.png" alt="" />
         <Brand href="/" style={{ position: "absolute", left: 36, top: 32 }} />
         <div style={{ position: "absolute", left: 36, right: 36, bottom: 36 }}>
           <div style={{ fontSize: 40, fontWeight: 500, letterSpacing: "-.04em", lineHeight: 1.05 }}>

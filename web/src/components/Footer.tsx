@@ -69,22 +69,22 @@ export function Footer() {
         <Link href="/app/trade" className="tile main">
           <TileIcon d="M3 17l6-6 4 4 7-7M14 8h7v7" stroke="currentColor" />
           <span>
-            <b style={{ display: "block", fontWeight: 500 }}>Start trading</b>
-            <span style={{ fontSize: 14, color: "var(--ink2)" }}>13 markets on devnet</span>
+            <b className="tile-t">Start trading</b>
+            <span className="tile-sub">13 markets on devnet</span>
           </span>
         </Link>
         <Link href="/open-index" className="tile">
           <TileIcon d="M12 3v18M5 8h14M5 16h14" stroke="#A1A1A6" />
           <span>
-            <b style={{ display: "block", fontWeight: 500 }}>Open index</b>
-            <span style={{ fontSize: 14, color: "var(--ink2)" }}>Every source, published</span>
+            <b className="tile-t">Open index</b>
+            <span className="tile-sub">Every source, published</span>
           </span>
         </Link>
         <Link href="/docs/risks" className="tile">
           <TileIcon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#A1A1A6" />
           <span>
-            <b style={{ display: "block", fontWeight: 500 }}>Devnet only</b>
-            <span style={{ fontSize: 14, color: "var(--ink2)" }}>Test money, no risk</span>
+            <b className="tile-t">Devnet only</b>
+            <span className="tile-sub">Test money, no risk</span>
           </span>
         </Link>
       </div>

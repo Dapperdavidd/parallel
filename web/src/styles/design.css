@@ -131,6 +131,8 @@ a.mrow:hover{background:#ffffff06}
 .tile{flex:1 1 260px;display:flex;align-items:center;gap:16px;padding:24px;border-radius:22px;background:#121214;border:1px solid var(--ln2)}
 .tile.main{background:#141A33;border-color:#3D5CF566}
 .tile.main:hover{border-color:var(--pri)}
+.tile-t{display:block;font-weight:500}
+.tile-sub{font-size:14px;color:var(--ink2)}
 .wordmark{position:relative;height:300px;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .wordmark:before{content:"";position:absolute;left:28%;right:28%;top:15%;bottom:5%;background:radial-gradient(50% 50% at 50% 55%,rgba(61,92,245,.42),rgba(61,92,245,0) 70%)}
 .wm{position:relative;font-size:clamp(90px,17vw,260px);font-weight:600;letter-spacing:-.06em;line-height:1;white-space:nowrap;
@@ -242,10 +244,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 /* Glass logo: the prototype set the mask and aspect ratio from JS after the
    image loaded. We know both at build time, so set them here and keep the
    hand-off note's promise of "CSS transforms only, no JS animation loop". */
-.logo-float{--logo-ar:0.8623}
+/* 722 x 836 — the thick-glass PNG's own ratio. */
+.logo-float{--logo-ar:0.8636}
 .logo-sweep{
-  -webkit-mask-image:url(/media/parallel-logo-glass.png);
-  mask-image:url(/media/parallel-logo-glass.png);
+  -webkit-mask-image:url(/media/parallel-logo-thick-glass.png);
+  mask-image:url(/media/parallel-logo-thick-glass.png);
 }
 
 /* ---------- polish fixes found in review ---------- */
@@ -1009,3 +1012,40 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 
 /* The app's bottom tab bar predates the cobalt surface; keep it in step. */
 .app .atabs{background:#0A0E1C;border-top-color:var(--ln)}
+
+/* ================= hero logo: centred ================= */
+/* The intro stage is its own hero, so the off-centre 62% from the original
+   layout never applied to it through .hero-full. Centre it explicitly. */
+.intro-video .logo-float{left:50%;top:44%;height:54%}
+
+/* On a phone the frame is portrait, so a 16:9 video gets cropped hard. The
+   people are in the left-of-centre third — hold that, not the machines on the
+   right, and keep the logo over the middle. */
+@media (max-width:700px){
+  .intro-video video{object-position:30% 50%}
+  .intro-video .logo-float{left:50%;top:50%;height:32%}
+}
+
+/* ================= footer on a phone ================= */
+/* The three tiles were a full-width stack three rows deep. They are shortcuts,
+   not sections — stand them side by side and let them be small. */
+@media (max-width:620px){
+  .tiles{flex-wrap:nowrap;gap:8px}
+  .tile{flex:1 1 0;min-width:0;flex-direction:column;align-items:flex-start;
+    gap:9px;padding:13px 11px;border-radius:15px}
+  .tile svg{width:19px;height:19px}
+  .tile-t{font-size:13.5px;line-height:1.25}
+  .tile-sub{font-size:11px;line-height:1.3;display:block;margin-top:2px}
+
+  /* Three short columns read as one block; two columns left the third
+     stranded under the first with a hole beside it. */
+  .fcols{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .fcols h4{margin-bottom:10px;font-size:12.5px}
+  .fcols a{font-size:13px;margin-bottom:9px;line-height:1.35}
+
+  footer.wrap{padding-top:72px;gap:34px}
+}
+@media (max-width:380px){
+  /* Below this the subtitle cannot hold a line; the title still says it. */
+  .tile-sub{display:none}
+}
