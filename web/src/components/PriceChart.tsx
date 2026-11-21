@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createChart,
   ColorType,
@@ -11,7 +11,24 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { candlesFor, type Market, type Position } from "@/lib/mock";
+import { candlesFor, type Candle, type Market, type Position } from "@/lib/mock";
+
+/** What /api/candles returns. */
+interface ChartFeed {
+  /** OHLC in the familiar quote — local currency per USD. */
+  candles: { openTs: string; open: number; high: number; low: number; close: number }[];
+  ticks: { ts: string; price: number; median: number | null }[];
+  official: number | null;
+  officialHistory: { date: string; rate: number }[];
+}
+
+/**
+ * The index has only existed since the service started running, so a new
+ * market has minutes of history, not months. Below this many real candles the
+ * chart would be a stub, and we show the published official-rate history
+ * instead — clearly as the official rate, never as our street index.
+ */
+const MIN_REAL_CANDLES = 8;
 
 /** PRD F6 asks for five timeframes. */
 export const TIMEFRAMES = ["1H", "4H", "1D", "1W", "1M"] as const;
@@ -37,10 +54,13 @@ export function PriceChart({
   market,
   timeframe,
   positions,
+  onSource,
 }: {
   market: Market;
   timeframe: Timeframe;
   positions: Position[];
+  /** Tells the caller what the chart is actually showing, so it can say so. */
+  onSource?: (s: { mode: "index" | "official" | "sample"; indexFrom: string | null }) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -106,6 +126,29 @@ export function PriceChart({
     };
   }, []);
 
+  // Real index history, when there is any.
+  const [feed, setFeed] = useState<ChartFeed | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/candles?market=${encodeURIComponent(`USD/${market.c}`)}&tf=${timeframe}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const body = (await res.json()) as ChartFeed;
+        if (!cancelled) setFeed(body);
+      } catch {
+        // Leave `feed` null: the chart falls back to the sample series rather
+        // than showing nothing.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [market.c, timeframe]);
+
   // Feed it data whenever the market, timeframe or the viewer's trades change.
   useEffect(() => {
     const candles = candleRef.current;
@@ -113,7 +156,42 @@ export function PriceChart({
     const chart = chartRef.current;
     if (!candles || !official || !chart) return;
 
-    const data = candlesFor(market, 120, STEP_SECONDS[timeframe]);
+    const real = feed?.candles ?? [];
+    const officialPts = feed?.officialHistory ?? [];
+
+    const toCandle = (c: ChartFeed["candles"][number]): Candle => ({
+      time: Math.floor(new Date(c.openTs).getTime() / 1000),
+      open: c.open, high: c.high, low: c.low, close: c.close,
+    });
+
+    let data: Candle[];
+    let mode: "index" | "official" | "sample";
+    let backfill: { time: number; value: number }[] = [];
+
+    if (real.length >= MIN_REAL_CANDLES) {
+      // Enough measured history to draw the index itself.
+      data = real.map(toCandle);
+      mode = "index";
+    } else if (officialPts.length > 0) {
+      // Pre-launch. Draw the published official rate as a line — it is a
+      // daily publication with no intraday range, so candles would imply a
+      // high and low nobody published. Whatever index history exists is drawn
+      // as candles on top, so the handover is visible rather than blended.
+      backfill = officialPts.map((p) => ({
+        time: Math.floor(new Date(`${p.date}T00:00:00Z`).getTime() / 1000),
+        value: p.rate,
+      }));
+      data = real.map(toCandle);
+      mode = "official";
+    } else {
+      data = candlesFor(market, 120, STEP_SECONDS[timeframe]);
+      mode = "sample";
+    }
+
+    onSource?.({
+      mode,
+      indexFrom: real.length > 0 ? real[0]!.openTs : null,
+    });
     candles.setData(
       data.map((c) => ({
         time: c.time as UTCTimestamp,
@@ -123,9 +201,16 @@ export function PriceChart({
         close: c.close,
       })),
     );
-    official.setData(
-      data.map((c) => ({ time: c.time as UTCTimestamp, value: market.off })),
-    );
+    // The dashed line is either the official-rate history (pre-launch) or the
+    // current official rate drawn flat across the measured span.
+    if (backfill.length > 0) {
+      official.setData(backfill.map((b) => ({ time: b.time as UTCTimestamp, value: b.value })));
+    } else {
+      const officialRate = feed?.official ?? market.off;
+      official.setData(
+        data.map((c) => ({ time: c.time as UTCTimestamp, value: officialRate })),
+      );
+    }
 
     // Mark price: a labelled line at the latest index value. Remove the
     // previous one first — createPriceLine adds, it does not replace, so
@@ -153,7 +238,7 @@ export function PriceChart({
     );
 
     chart.timeScale().fitContent();
-  }, [market, timeframe, positions]);
+  }, [market, timeframe, positions, feed, onSource]);
 
   return (
     <div

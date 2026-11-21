@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { compactUsd, fmt, premium, statsFor, type Market } from "@/lib/mock";
+import { useLive } from "@/lib/live";
 
 function Stat({
   label,
@@ -30,6 +31,17 @@ const countdown = (sec: number): string => {
 
 export function MarketStats({ market }: { market: Market }) {
   const s = statsFor(market);
+  const { byCode } = useLive();
+  const live = byCode.get(market.c);
+
+  // Mark, index and official have a live source; volume, open interest and
+  // funding do not yet — they stay sample values until there are real trades
+  // to measure, and the devnet chip on the top bar says this is a test net.
+  const index = live?.median ?? s.index;
+  const mark = live?.median ?? s.mark;
+  const official = live?.official ?? market.off;
+  const change = live?.change24hPct ?? s.change24hPct;
+  const paused = live ? !live.acceptingPositions : false;
 
   /**
    * The funding countdown depends on the wall clock, so rendering it during
@@ -44,8 +56,9 @@ export function MarketStats({ market }: { market: Market }) {
     return () => clearInterval(t);
   }, []);
 
-  const gap = premium(market);
-  const up = s.change24hPct >= 0;
+  const gap =
+    live?.premiumPct ?? premium(market);
+  const up = change >= 0;
   const span = Math.max(s.high24h - s.low24h, 1e-9);
   const markPos = Math.min(100, Math.max(0, ((s.mark - s.low24h) / span) * 100));
 
@@ -53,22 +66,22 @@ export function MarketStats({ market }: { market: Market }) {
     <div className="hstats">
       <Stat
         label="Mark"
-        value={fmt(s.mark, market.dp)}
+        value={fmt(mark, market.dp)}
         hint="The engine's effective price. Positions are marked against this."
       />
       <Stat
         label="Index"
-        value={fmt(s.index, market.dp)}
+        value={fmt(index, market.dp)}
         hint="Median of the street sources. The mark walks toward it."
       />
       <Stat
         label="24h change"
-        value={`${up ? "+" : ""}${s.change24hPct.toFixed(2)}%`}
+        value={`${up ? "+" : ""}${change.toFixed(2)}%`}
         color={up ? "var(--up)" : "var(--dn)"}
       />
       <Stat
         label="Official"
-        value={fmt(market.off, market.dp)}
+        value={fmt(official, market.dp)}
         hint="The official rate, for comparison. Never part of the median."
       />
       <Stat
@@ -86,6 +99,15 @@ export function MarketStats({ market }: { market: Market }) {
         hint="Positive means longs pay shorts."
       />
       <Stat label="Contract" value={market.unitLabel} hint="Each contract is this much local currency." />
+
+      {paused && (
+        <div className="hstat" title={live?.reason ?? undefined}>
+          <span className="hstat-l">Status</span>
+          <b className="hstat-v" style={{ color: "var(--dn)" }}>
+            Paused
+          </b>
+        </div>
+      )}
 
       {/* Where the mark sits in the day's range — the one thing the numbers
           above cannot show you at a glance. */}

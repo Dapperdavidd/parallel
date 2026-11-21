@@ -132,24 +132,29 @@ export function useLive(): LiveState {
  * session — a paused market keeps its last sample price and reports false, so
  * a caller can label it honestly.
  */
-export function useMarket(code: string): Market & { live: boolean; paused: boolean; reason: string | null } {
+export function useMarket(
+  code: string,
+): Market & { live: boolean; paused: boolean; reason: string | null } {
   const { byCode } = useLive();
-  const base = MARKETS.find((m) => m.c === code) ?? MARKETS[0]!;
-  const l = byCode.get(code);
 
-  if (!l) return { ...base, live: false, paused: false, reason: null };
-
-  return {
-    ...base,
-    px: l.median ?? base.px,
-    off: l.official ?? base.off,
-    lev: l.maxLeverage,
-    st: l.acceptingPositions ? base.st : "Beta",
-    src: l.sources.length > 0 ? l.sources : base.src,
-    live: l.median !== null,
-    paused: !l.acceptingPositions,
-    reason: l.reason,
-  };
+  // Memoised: callers pass this straight into effect dependency arrays, and a
+  // fresh object every render re-fires those effects forever.
+  return useMemo(() => {
+    const base = MARKETS.find((m) => m.c === code) ?? MARKETS[0]!;
+    const l = byCode.get(code);
+    if (!l) return { ...base, live: false, paused: false, reason: null };
+    return {
+      ...base,
+      px: l.median ?? base.px,
+      off: l.official ?? base.off,
+      lev: l.maxLeverage,
+      st: l.acceptingPositions ? base.st : base.st,
+      src: l.sources.length > 0 ? l.sources : base.src,
+      live: l.median !== null,
+      paused: !l.acceptingPositions,
+      reason: l.reason,
+    };
+  }, [byCode, code]);
 }
 
 /** Every market, live numbers applied. Order follows the sample data. */

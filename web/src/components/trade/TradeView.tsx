@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { byCode } from "@/lib/mock";
+import { useMarket } from "@/lib/live";
 import { useDemo } from "@/lib/store";
 import { PriceChart, TIMEFRAMES, type Timeframe } from "@/components/PriceChart";
 import { MarketSelect } from "./MarketSelect";
@@ -32,7 +33,34 @@ export function TradeView() {
     if (requested && requested !== stateMarket) setMarket(requested);
   }, [requested, stateMarket, setMarket]);
 
-  const m = byCode(requested ?? stateMarket);
+  // Live street price where the index has it; sample values where it does not.
+  const code = byCode(requested ?? stateMarket).c;
+  const m = useMarket(code);
+
+  // The chart says what it is actually drawing — measured index, or the
+  // published official rate standing in for the span before we existed.
+  const [source, setSource] = useState<{
+    mode: "index" | "official" | "sample";
+    indexFrom: string | null;
+  }>({ mode: "sample", indexFrom: null });
+  // Only update when something actually changed: the chart reports on every
+  // data pass, and a new object each time would re-render in a loop.
+  const onSource = useCallback(
+    (next: { mode: "index" | "official" | "sample"; indexFrom: string | null }) =>
+      setSource((prev) =>
+        prev.mode === next.mode && prev.indexFrom === next.indexFrom ? prev : next,
+      ),
+    [],
+  );
+
+  const caption =
+    source.mode === "index"
+      ? "Parallel street index · official rate dashed"
+      : source.mode === "official"
+        ? source.indexFrom
+          ? `Official rate history · street index from ${new Date(source.indexFrom).toLocaleDateString()}`
+          : "Official rate history · street index building"
+        : "Sample data";
 
   return (
     <div className="tpage">
@@ -55,11 +83,11 @@ export function TradeView() {
               </button>
             ))}
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink3)", paddingRight: 4 }}>
-              Parallel street index · official rate dashed
+              {caption}
             </span>
           </div>
 
-          <PriceChart market={m} timeframe={tf} positions={positions} />
+          <PriceChart market={m} timeframe={tf} positions={positions} onSource={onSource} />
           <BottomPanel market={m} />
         </section>
 

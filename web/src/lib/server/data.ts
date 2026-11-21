@@ -114,6 +114,8 @@ const readLines = async <T>(path: string): Promise<T[]> => {
 };
 
 const tickFile = (id: string): string => join(DATA_DIR, "ticks", `${id.replace("/", "-")}.jsonl`);
+const officialFile = (id: string): string =>
+  join(DATA_DIR, "official", `${id.replace("/", "-")}.json`);
 const candleFile = (id: string): string => join(DATA_DIR, "candles", `${id.replace("/", "-")}.json`);
 
 // ------------------------------------------------------------------ markets --
@@ -299,4 +301,22 @@ export async function recentTrades(marketId: string | null, limit = 40): Promise
   const all = await readLines<Trade>(join(DATA_DIR, "trades.jsonl"));
   const filtered = marketId ? all.filter((t) => t.marketId === marketId) : all;
   return filtered.slice(Math.max(0, filtered.length - limit)).reverse();
+}
+
+// -------------------------------------------------------- official history --
+
+export interface OfficialPoint {
+  date: string;
+  rate: number;
+  unitPriceUsd: number;
+}
+
+/**
+ * Daily published official rates, for the span of the chart that predates the
+ * index. A different quantity from the street median, and labelled as such
+ * wherever it is drawn.
+ */
+export async function officialHistory(marketId: string, limit = 400): Promise<OfficialPoint[]> {
+  const all = await readJson<OfficialPoint[]>(officialFile(marketId), []);
+  return all.slice(Math.max(0, all.length - limit));
 }
