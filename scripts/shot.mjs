@@ -36,9 +36,15 @@ setTimeout(() => {
   process.exit(1);
 }, HARD_TIMEOUT_MS).unref();
 
+// Headless defaults to no GPU, which also means no WebGL. --gpu swaps in a
+// software rasteriser so WebGL content can be captured.
+const GPU = flags.includes("--gpu");
+
 const chrome = spawn(CHROME, [
   "--headless=new",
-  "--disable-gpu",
+  ...(GPU
+    ? ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+    : ["--disable-gpu"]),
   "--hide-scrollbars",
   `--remote-debugging-port=${PORT}`,
   "--no-first-run",
@@ -96,7 +102,8 @@ if (STATE) {
 }
 
 await send("Page.navigate", { url: URL_ });
-await sleep(5500);
+// --wait= for pages that need longer to settle (software WebGL, say).
+await sleep(Number(flags.find((f) => f.startsWith("--wait="))?.slice(7) ?? 5500));
 
 const SCROLL = flags.find((f) => f.startsWith("--scroll="))?.slice(9);
 if (SCROLL) {

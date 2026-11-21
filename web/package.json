@@ -10,10 +10,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/three": "^0.187.0",
+    "lightweight-charts": "^4.2.3",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lightweight-charts": "^4.2.3"
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

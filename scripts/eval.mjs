@@ -17,8 +17,12 @@ const STATE = flags.find((f) => f.startsWith("--state="))?.slice(8);
 const PORT = 9226;
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
+const GPU = flags.includes("--gpu");
 const chrome = spawn(CHROME, [
-  "--headless=new", "--disable-gpu", "--hide-scrollbars",
+  "--headless=new", "--hide-scrollbars",
+  ...(GPU
+    ? ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+    : ["--disable-gpu"]),
   `--remote-debugging-port=${PORT}`, "--no-first-run",
   "--user-data-dir=/tmp/chrome-eval-profile", "about:blank",
 ], { stdio: "ignore" });

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MarketRows } from "./MarketsTable";
+import { GlassLogo } from "./GlassLogo";
 import { LANDING_ROWS } from "@/lib/mock";
 
 /**
@@ -28,7 +29,11 @@ export function IntroStage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const logoRef = useRef<HTMLDivElement>(null);
   const [reduced, setReduced] = useState(false);
+  // The PNG holds the frame until WebGL has actually drawn something.
+  const [glassLive, setGlassLive] = useState(false);
+  const onGlassLive = useCallback((live: boolean) => setGlassLive(live), []);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -139,7 +144,7 @@ export function IntroStage() {
 
         {/* One rectangle. Two contents. */}
         <div className="intro-frame" ref={frameRef}>
-          <div className="intro-video">
+          <div className={`intro-video${glassLive ? " glass-live" : ""}`}>
             <video
               ref={videoRef}
               autoPlay
@@ -154,7 +159,14 @@ export function IntroStage() {
               <source src="/media/parallel-hero-1080.mp4" type="video/mp4" />
             </video>
 
-            <div className="logo-float" aria-hidden="true">
+            {/* The PNG is the baseline. GlassLogo renders the same mark as a
+                real refracting solid over the top and fades this out, but only
+                once it has a frame on screen — so any failure leaves this. */}
+            <div
+              className={`logo-float${glassLive ? " logo-retired" : ""}`}
+              ref={logoRef}
+              aria-hidden="true"
+            >
               <div className="logo-shadow" />
               <div className="logo-bob">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -162,6 +174,10 @@ export function IntroStage() {
                 <div className="logo-sweep" />
               </div>
             </div>
+
+            {!reduced && (
+              <GlassLogo videoRef={videoRef} anchorRef={logoRef} onLive={onGlassLive} />
+            )}
 
             <div className="hero-copy">
               <div className="hero-copy-left">

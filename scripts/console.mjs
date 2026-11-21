@@ -12,7 +12,10 @@ const PORT = 9226;
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 const chrome = spawn(CHROME, [
-  "--headless=new", "--disable-gpu", `--remote-debugging-port=${PORT}`,
+  "--headless=new",
+  ...(process.argv.includes("--gpu")
+    ? ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+    : ["--disable-gpu"]), `--remote-debugging-port=${PORT}`,
   "--no-first-run", "--user-data-dir=/tmp/chrome-console-profile", "about:blank",
 ], { stdio: "ignore" });
 const cleanup = () => { try { chrome.kill(); } catch { /* gone */ } };
@@ -67,7 +70,16 @@ await send("Runtime.enable");
 await send("Network.enable");
 await send("Log.enable");
 await send("Page.enable");
+// Headless defaults to 800x600, which is narrow enough to trip the app's own
+// mobile breakpoints — so a desktop-only code path would never run and the
+// log would look empty for the wrong reason.
+await send("Emulation.setDeviceMetricsOverride", {
+  width: 1512, height: 900, deviceScaleFactor: 1, mobile: false,
+});
 await send("Page.navigate", { url: URL_ });
-await sleep(7000);
+const WAIT = Number(
+  process.argv.find((a) => a.startsWith("--wait="))?.slice(7) ?? 7000,
+);
+await sleep(WAIT);
 
 ws.close(); cleanup(); process.exit(0);

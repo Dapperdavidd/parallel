@@ -1049,3 +1049,17 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
   /* Below this the subtitle cannot hold a line; the title still says it. */
   .tile-sub{display:none}
 }
+
+/* ================= the glass mark, in WebGL ================= */
+/* Covers the hero frame so the refraction patch has somewhere to live; the
+   mark itself is placed inside it from the PNG's measured box. */
+.glass-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;
+  pointer-events:none}
+/* The PNG stays until the first WebGL frame, then steps aside. Only its image
+   fades — the drop shadow underneath still grounds the mark. */
+.logo-float.logo-retired .logo-bob{opacity:0;transition:opacity .5s ease}
+.logo-float .logo-bob{transition:opacity .5s ease}
+/* Once WebGL is drawing the frame, the DOM video steps aside rather than
+   showing through as a second copy. It keeps playing — that element is what
+   the VideoTexture reads — it is simply no longer the thing you see. */
+.intro-video.glass-live video{opacity:0}
