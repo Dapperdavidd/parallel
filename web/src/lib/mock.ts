@@ -235,6 +235,11 @@ export interface MarketStats {
   fundingPct: number;
   /** Seconds until the next funding settlement. */
   fundingCountdownSec: number;
+  /** 24h low and high, taken off the same candles the chart draws. */
+  low24h: number;
+  high24h: number;
+  /** Share of open interest sitting long, 0-100. */
+  longSharePct: number;
 }
 
 export function statsFor(m: Market): MarketStats {
@@ -244,6 +249,7 @@ export function statsFor(m: Market): MarketStats {
     return seed / 233280;
   };
   const drift = (rnd() - 0.5) * 0.0025;
+  const day = candlesFor(m, 24, 3600);
   return {
     mark: m.px * (1 + drift),
     index: m.px,
@@ -252,6 +258,11 @@ export function statsFor(m: Market): MarketStats {
     openInterestUsd: 20_000 + rnd() * 400_000,
     fundingPct: (rnd() - 0.45) * 0.03,
     fundingCountdownSec: 3600 - (Math.floor(Date.now() / 1000) % 3600),
+    // Read off the chart's own candles rather than invented separately, so
+    // the range bar and the chart can never disagree.
+    low24h: Math.min(...day.map((c) => c.low)),
+    high24h: Math.max(...day.map((c) => c.high)),
+    longSharePct: 34 + rnd() * 32,
   };
 }
 

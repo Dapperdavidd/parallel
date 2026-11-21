@@ -46,6 +46,8 @@ export function MarketStats({ market }: { market: Market }) {
 
   const gap = premium(market);
   const up = s.change24hPct >= 0;
+  const span = Math.max(s.high24h - s.low24h, 1e-9);
+  const markPos = Math.min(100, Math.max(0, ((s.mark - s.low24h) / span) * 100));
 
   return (
     <div className="hstats">
@@ -84,6 +86,19 @@ export function MarketStats({ market }: { market: Market }) {
         hint="Positive means longs pay shorts."
       />
       <Stat label="Contract" value={market.unitLabel} hint="Each contract is this much local currency." />
+
+      {/* Where the mark sits in the day's range — the one thing the numbers
+          above cannot show you at a glance. */}
+      <div className="hstat hrange" title="24h range, with the mark price marked">
+        <span className="hstat-l">24h range</span>
+        <div className="hrange-row">
+          <b className="mono">{fmt(s.low24h, market.dp)}</b>
+          <span className="hrange-track">
+            <span className="hrange-dot" style={{ left: `${markPos}%` }} />
+          </span>
+          <b className="mono">{fmt(s.high24h, market.dp)}</b>
+        </div>
+      </div>
     </div>
   );
 }
