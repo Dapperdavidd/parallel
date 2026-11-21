@@ -86,6 +86,16 @@ await send("Emulation.setDeviceMetricsOverride", {
 await send("Page.navigate", { url: URL_ });
 await sleep(5500);
 
+const SCROLL = flags.find((f) => f.startsWith("--scroll="))?.slice(9);
+if (SCROLL) {
+  // Absolute scroll, in px or in viewport heights with a `vh` suffix.
+  const expr = SCROLL.endsWith("vh")
+    ? `scrollTo({top: innerHeight * ${parseFloat(SCROLL)}, behavior:"instant"})`
+    : `scrollTo({top: ${parseFloat(SCROLL)}, behavior:"instant"})`;
+  await send("Runtime.evaluate", { expression: expr });
+  await sleep(1600);
+}
+
 if (TO) {
   await send("Runtime.evaluate", {
     expression: `(()=>{const e=document.querySelector(${JSON.stringify(TO)});

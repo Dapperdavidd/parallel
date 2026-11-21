@@ -66,6 +66,35 @@ export default function HomePage() {
             <span style={{ fontSize: 13, color: "var(--ink3)" }}>
               Devnet beta · test money only · mainnet coming soon
             </span>
+
+            {/* Risk sits with the sign-up, where it is actually relevant,
+                rather than buried at the bottom of the footer. */}
+            <div
+              id="risk"
+              style={{
+                marginTop: 14,
+                paddingTop: 20,
+                borderTop: "1px solid var(--ln)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                fontSize: 13.5,
+                lineHeight: 1.7,
+                color: "var(--ink3)",
+                maxWidth: 560,
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink2)" }}>
+                Risk disclosure
+              </span>
+              <p style={{ margin: 0 }}>
+                Parallel is a beta running on Solana devnet. Balances are test tokens with no
+                cash value. Perpetual futures are leveraged products: a position can be
+                liquidated and you can lose the margin you committed. Prices come from public
+                exchange and peer-to-peer venues and can differ from any official rate. Nothing
+                here is financial advice.
+              </p>
+            </div>
           </div>
         </div>
       </section>

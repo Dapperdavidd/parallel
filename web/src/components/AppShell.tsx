@@ -23,7 +23,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app">
       <div className="atop">
-        <Brand href="/" size={18} markSize={24} hideLabelOnSmall />
+        {/* Inside the app the mark is not a way out: signed-in users expect it
+            to go to the app's home, not back to the marketing site. */}
+        <Brand href="/app/trade" size={18} markSize={24} hideLabelOnSmall />
         <div className="atabs">
           {TABS.map(([slug, label]) => (
             <Link

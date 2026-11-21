@@ -24,6 +24,7 @@ import { TopBanner, LandingNav } from "./LandingNav";
  */
 export function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const stageRef = useRef<HTMLElement>(null);
   const [reduced, setReduced] = useState(false);
 
   useEffect(() => {
@@ -61,22 +62,48 @@ export function Hero() {
     });
   }, []);
 
-  // Gentle parallax: the video drifts and dims as the hero scrolls away.
+  /**
+   * Exit transition.
+   *
+   * Scrolling does not simply push the hero away: the whole stage shrinks
+   * toward the centre and rounds off, so the video appears to minimise into a
+   * card and hand over to the section beneath. The copy fades a little faster
+   * than the frame so the handover reads as one move rather than two.
+   */
   useEffect(() => {
     if (reduced) return;
-    const onScroll = (): void => {
-      const v = videoRef.current;
-      if (!v) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    let raf = 0;
+    const apply = (): void => {
+      raf = 0;
       const t = Math.min(1, Math.max(0, window.scrollY / window.innerHeight));
-      v.style.transform = `scale(${1 + t * 0.08}) translateY(${t * 4}%)`;
-      v.style.opacity = `${1 - t * 0.35}`;
+      const ease = t * t * (3 - 2 * t); // smoothstep
+
+      stage.style.transform = `scale(${1 - ease * 0.26}) translateY(${ease * -4}vh)`;
+      stage.style.borderRadius = `${ease * 36}px`;
+      stage.style.opacity = `${1 - ease * 0.55}`;
+
+      const copy = stage.querySelector<HTMLElement>(".hero-copy");
+      if (copy) copy.style.opacity = `${1 - Math.min(1, ease * 1.7)}`;
+      const cue = stage.querySelector<HTMLElement>(".hero-cue");
+      if (cue) cue.style.opacity = `${1 - Math.min(1, ease * 2.4)}`;
     };
+    const onScroll = (): void => {
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+
+    apply();
     addEventListener("scroll", onScroll, { passive: true });
-    return () => removeEventListener("scroll", onScroll);
+    return () => {
+      removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [reduced]);
 
   return (
-    <section className="hero-full" aria-label="Hero">
+    <section className="hero-full" aria-label="Hero" ref={stageRef}>
       <video
         ref={videoRef}
         autoPlay

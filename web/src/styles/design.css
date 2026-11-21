@@ -249,8 +249,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 .hero-bottom > *{min-width:0}
 .hero p{max-width:min(400px,100%)}
 
-/* Nothing on the page should be able to scroll the document sideways. */
-html,body{max-width:100%;overflow-x:hidden}
+/* NOTE: do NOT add `overflow-x:hidden` to html/body as a catch-all here.
+   It turns the root into a scroll container, which silently disables every
+   `position:sticky` on the page — it broke the pinned feature sequence. The
+   real overflow cause (.fcols) is fixed below; use
+   `node scripts/find-overflow.mjs <url> 390` to catch regressions instead. */
 
 /* Let the chart take the room the trade layout actually has, instead of a
    fixed 420px that leaves dead space under the positions table. */
@@ -354,3 +357,73 @@ html,body{max-width:100%;overflow-x:hidden}
   /* Keep the glass mark above the headline rather than behind it. */
   .hero-full .logo-float{top:30%;height:21%}
 }
+
+/* ================= landing revisions ================= */
+
+/* Clear glass, not tinted: the nav pill and the sign-in button now use the
+   same treatment so they read as one material. */
+.navpill{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);
+  backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}
+.navpill a{color:#E8E8EA}
+.navpill a:hover{background:rgba(255,255,255,.12);color:#fff}
+
+.btn-glass{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);
+  backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);
+  color:#fff;box-shadow:none}
+.btn-glass:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28)}
+
+/* The glass mark sits dead centre of the stage. */
+.hero-full .logo-float{left:50%;top:42%;height:46%}
+@media (max-width:900px){.hero-full .logo-float{left:50%;top:30%;height:21%}}
+
+/* Hero exit: instead of simply receding, the whole stage shrinks toward the
+   middle and rounds off, handing over to the section beneath it. */
+.hero-full{transform-origin:50% 0;will-change:transform,border-radius,opacity}
+
+/* ---- "Built for the gap": pinned scroll sequence ----
+   The track is tall; the stage inside is sticky and fills the viewport, so the
+   four features swap in place rather than scrolling past one another. */
+.feat-track{position:relative}
+.feat-stage{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+@supports not (height:100svh){.feat-stage{height:100vh}}
+.feat-stage-inner{display:grid;grid-template-columns:1.25fr 1fr;gap:64px;align-items:center;width:100%}
+.feat-screen{position:relative;min-height:420px}
+.feat-screen > div{position:absolute;inset:0;opacity:0;transform:translateY(22px) scale(.97);
+  transition:opacity .55s cubic-bezier(.4,0,.2,1),transform .55s cubic-bezier(.4,0,.2,1);pointer-events:none}
+.feat-screen > div.on{opacity:1;transform:none;pointer-events:auto}
+.feat-text{position:relative;min-height:260px}
+.feat-text > div{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:14px;
+  opacity:0;transform:translateY(18px);transition:opacity .5s cubic-bezier(.4,0,.2,1),transform .5s cubic-bezier(.4,0,.2,1)}
+.feat-text > div.on{opacity:1;transform:none}
+.feat-text h3{margin:0;font-size:clamp(30px,3.4vw,46px);font-weight:500;letter-spacing:-.03em;color:var(--ink)}
+.feat-text p{margin:0;font-size:18px;line-height:1.6;color:var(--ink2);max-width:460px}
+/* Progress rail, so the reader can see where they are in the sequence. */
+.feat-dots{display:flex;gap:8px;margin-top:26px}
+.feat-dots button{all:unset;cursor:pointer;height:3px;width:42px;border-radius:3px;background:#2A2A30;transition:background .3s}
+.feat-dots button.on{background:var(--pri)}
+@media (max-width:900px){
+  .feat-stage-inner{grid-template-columns:1fr;gap:28px}
+  .feat-screen{min-height:300px}
+  .feat-text{min-height:200px}
+  .feat-text p{font-size:16px}
+}
+
+/* `.wrap` carries `margin:0 auto`, which inside a flex column makes it shrink
+   to its content instead of filling the stage. Pin it to full width. */
+.feat-stage > .wrap{width:100%}
+.feat-stage .h2{margin:0}
+/* Give the mock room; at 1.25fr it was rendering about a third of its width. */
+.feat-screen{min-height:min(460px,52vh)}
+.feat-screen .mock{height:100%;display:flex;flex-direction:column}
+.feat-screen .glowframe{height:100%}
+.feat-stage-inner{align-items:center}
+@media (min-width:901px){.feat-stage-inner{grid-template-columns:1.15fr .85fr}}
+
+/* Make the pinned stage reliably fill the viewport and centre its content.
+   height alone was not holding, leaving the block pinned to the top with dead
+   space under it. */
+.feat-stage{min-height:100svh;padding:clamp(20px,5vh,64px) 0}
+@supports not (min-height:100svh){.feat-stage{min-height:100vh}}
+.feat-screen{min-height:0;height:clamp(340px,44vh,440px)}
+.feat-text{min-height:0;height:clamp(180px,22vh,240px)}
+.feat-screen .mock{height:100%}
