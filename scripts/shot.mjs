@@ -83,6 +83,18 @@ await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", {
   width: WIDTH, height: HEIGHT, deviceScaleFactor: MOBILE ? 2 : 1, mobile: MOBILE,
 });
+// --state=<json> seeds the demo store before the app loads, so pages behind
+// sign-in can be captured without driving the sign-in form every time.
+const STATE = flags.find((f) => f.startsWith("--state="))?.slice(8);
+if (STATE) {
+  const origin = new URL(URL_).origin;
+  await send("Page.navigate", { url: `${origin}/` });
+  await sleep(1500);
+  await send("Runtime.evaluate", {
+    expression: `sessionStorage.setItem("parallel.demo", ${JSON.stringify(STATE)})`,
+  });
+}
+
 await send("Page.navigate", { url: URL_ });
 await sleep(5500);
 

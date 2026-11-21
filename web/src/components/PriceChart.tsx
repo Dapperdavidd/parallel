@@ -56,16 +56,16 @@ export function PriceChart({
     const chart = createChart(host, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#8A8A90",
+        textColor: "#868CA2",
         fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "#1C1C1F" },
-        horzLines: { color: "#1C1C1F" },
+        vertLines: { color: "#161C2E" },
+        horzLines: { color: "#161C2E" },
       },
-      rightPriceScale: { borderColor: "#222225" },
-      timeScale: { borderColor: "#222225", timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: "#1C2238" },
+      timeScale: { borderColor: "#1C2238", timeVisible: true, secondsVisible: false },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: { color: "#3D5CF5", labelBackgroundColor: "#3D5CF5" },

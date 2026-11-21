@@ -1,10 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { fmt, DEMO_WALLET, DEVNET_TOPUP, STARTING_BALANCE } from "@/lib/mock";
+import { useMemo, useState } from "react";
+import {
+  ACCOUNT_FEES,
+  ACCOUNT_TRADES,
+  ACCOUNT_VOLUME,
+  DEMO_WALLET,
+  DEVNET_TOPUP,
+  EQUITY_RANGES,
+  STARTING_BALANCE,
+  accountStats,
+  compactUsd,
+  equitySeries,
+  fmt,
+  type EquityRange,
+} from "@/lib/mock";
 import { useDemo } from "@/lib/store";
 import { useToast } from "@/components/Toast";
+import { EquityChart } from "@/components/EquityChart";
 import { PositionsTable } from "@/components/trade/PositionsTable";
 
 function Action({
@@ -35,10 +49,36 @@ function Action({
   );
 }
 
+function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div className="ptile">
+      <div className="ptile-label">{label}</div>
+      <div className="ptile-value mono" style={tone ? { color: tone } : undefined}>
+        {value}
+      </div>
+      {sub && <div className="ptile-sub mono">{sub}</div>}
+    </div>
+  );
+}
+
+const TABS = ["Positions", "Balances", "Account"] as const;
+type Tab = (typeof TABS)[number];
+
 export default function PortfolioPage() {
   const { signedIn, user, balance, positions, openPnl, ready, topUp, signOut } = useDemo();
   const toast = useToast();
   const [copied, setCopied] = useState(false);
+  const [range, setRange] = useState<EquityRange>("1W");
+  const [tab, setTab] = useState<Tab>("Positions");
+
+  const margin = positions.reduce((a, p) => a + p.size, 0);
+  const equity = balance + margin + openPnl;
+
+  // The chart and every figure under it come from one series, so they cannot
+  // drift apart.
+  const series = useMemo(() => equitySeries(equity, range), [equity, range]);
+  const stats = useMemo(() => accountStats(series), [series]);
+  const up = stats.pnl >= 0;
 
   if (!ready) return null;
 
@@ -55,9 +95,6 @@ export default function PortfolioPage() {
       </div>
     );
   }
-
-  const margin = positions.reduce((a, p) => a + p.size, 0);
-  const equity = balance + margin + openPnl;
 
   return (
     <div className="page">
@@ -117,39 +154,127 @@ export default function PortfolioPage() {
         </div>
       </section>
 
-      <section style={{ marginTop: 28 }}>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>Open positions</h2>
-        <div className="card" style={{ padding: 0, overflowX: "auto" }}>
-          <PositionsTable />
+      {/* Performance: the curve, then the figures it produces. */}
+      <section className="perf">
+        <div className="perf-top">
+          <div>
+            <div className="ptile-label">Performance</div>
+            <div className="perf-pnl mono" style={{ color: up ? "var(--up)" : "var(--dn)" }}>
+              {up ? "+" : "−"}
+              {fmt(Math.abs(stats.pnl))}
+              <span className="perf-pct">
+                {up ? "+" : "−"}
+                {Math.abs(stats.pnlPct).toFixed(2)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="perf-ranges" role="tablist" aria-label="Chart range">
+            {EQUITY_RANGES.map((r) => (
+              <button
+                key={r}
+                type="button"
+                role="tab"
+                aria-selected={r === range}
+                className={r === range ? "on" : undefined}
+                onClick={() => setRange(r)}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <EquityChart data={series} up={up} />
+
+        <div className="ptiles">
+          <Tile
+            label="P&L"
+            value={`${up ? "+" : "−"}${fmt(Math.abs(stats.pnl))}`}
+            sub={`${range} · tUSDC`}
+            tone={up ? "var(--up)" : "var(--dn)"}
+          />
+          <Tile
+            label="Max drawdown"
+            value={`−${fmt(stats.maxDrawdown)}`}
+            sub={`${stats.maxDrawdownPct.toFixed(2)}% from peak`}
+          />
+          <Tile label="Total equity" value={fmt(stats.equity)} sub="tUSDC" />
+          <Tile label="Volume traded" value={compactUsd(ACCOUNT_VOLUME)} sub={`${ACCOUNT_TRADES} trades`} />
+          <Tile label="Fees paid" value={fmt(ACCOUNT_FEES)} sub="0.06% per trade" />
         </div>
       </section>
 
-      <section className="card" style={{ marginTop: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Account</div>
-        <div className="row">
-          Starting balance<b>{fmt(STARTING_BALANCE)} tUSDC</b>
+      <section className="pcard">
+        <div className="bpanel-tabs" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={t === tab}
+              className={t === tab ? "on" : undefined}
+              onClick={() => setTab(t)}
+            >
+              {t}
+              {t === "Positions" && positions.length > 0 ? ` (${positions.length})` : ""}
+            </button>
+          ))}
         </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          Network<b>Solana devnet</b>
+
+        <div className="pcard-body">
+          {tab === "Positions" && <PositionsTable />}
+
+          {tab === "Balances" && (
+            <table className="postable">
+              <thead>
+                <tr>
+                  <th>Asset</th>
+                  <th>Available</th>
+                  <th>In positions</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>tUSDC</td>
+                  <td className="mono">{fmt(balance)}</td>
+                  <td className="mono">{fmt(margin)}</td>
+                  <td className="mono">{fmt(balance + margin)}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          {tab === "Account" && (
+            <div className="pacct">
+              <div className="row">
+                Starting balance<b>{fmt(STARTING_BALANCE)} tUSDC</b>
+              </div>
+              <div className="row">
+                Network<b>Solana devnet</b>
+              </div>
+              <div className="row">
+                Wallet<b>Created at sign-in, no seed phrase</b>
+              </div>
+              <p>
+                Balances are devnet test tokens with no cash value. Your wallet is yours — you
+                can export it at any time.
+              </p>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ height: 38, fontSize: 13, alignSelf: "flex-start" }}
+                onClick={() => {
+                  signOut();
+                  toast("Signed out");
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          Wallet<b>Created at sign-in, no seed phrase</b>
-        </div>
-        <p style={{ fontSize: 13, color: "var(--ink3)", margin: "14px 0 0", lineHeight: 1.6 }}>
-          Balances are devnet test tokens with no cash value. Your wallet is yours — you can
-          export it at any time.
-        </p>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          style={{ height: 38, marginTop: 16, fontSize: 13 }}
-          onClick={() => {
-            signOut();
-            toast("Signed out");
-          }}
-        >
-          Sign out
-        </button>
       </section>
     </div>
   );

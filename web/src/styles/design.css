@@ -695,6 +695,29 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 .app .bpanel-tabs button.on{box-shadow:inset 0 -2px 0 var(--pri)}
 .app .lev-chip{background:#3D5CF52b;color:var(--pri-t)}
 
+/* ================= app surface: cobalt-tinted, not neutral black =================
+   The landing page stays neutral; inside the app every surface carries a trace
+   of the brand blue, the way a trading terminal reads as one material rather
+   than grey panels on black. These override the global tokens, so anything
+   already using var(--bg)/--s1/--s2/--s3/--ln/--ln2 picks the tint up for free. */
+.app{
+  --bg:#070A14;--s1:#0C1020;--s2:#101527;--s3:#161C31;
+  --ln:#1C2238;--ln2:#262E47;
+  --ink2:#A2A7BA;--ink3:#868CA2;
+  background:var(--bg);
+}
+.app .atop{background:#0A0E1C;border-bottom-color:var(--ln)}
+.app .cur{background:#141A2B;border-color:#242C44}
+.app .act{background:var(--s1);border-color:var(--ln2)}
+.app .act:hover:not(:disabled){background:var(--s2);border-color:#333C59}
+.app .act-hint{background:#131930;border-color:var(--ln2)}
+.app .btn-ghost{border-color:var(--ln2);background:#ffffff05}
+.app .btn-ghost:hover{border-color:#333C59}
+/* A faint cobalt wash from the top so the screen isn't a flat field. */
+.app::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(120% 70% at 50% -10%,rgba(61,92,245,.13),rgba(61,92,245,0) 60%)}
+.app > *{position:relative;z-index:1}
+
 /* ================= portfolio balance block ================= */
 .bal{padding:34px 0 0}
 .bal-label{font-size:13px;color:var(--ink3);letter-spacing:.02em}
@@ -718,6 +741,40 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
   font-size:12px;line-height:1.5;color:var(--ink2);box-shadow:0 14px 34px #0009;
   opacity:0;visibility:hidden;transform:translateY(-4px);transition:.18s;pointer-events:none}
 .act-wrap:hover .act-hint,.act-wrap:focus-within .act-hint{opacity:1;visibility:visible;transform:none}
+
+/* ================= portfolio performance ================= */
+.perf{margin-top:30px;border:1px solid var(--ln);border-radius:20px;background:var(--s1);
+  padding:20px 22px 6px}
+.perf-top{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px}
+.perf-pnl{font-size:30px;letter-spacing:-.02em;margin-top:4px;display:flex;align-items:baseline;gap:12px}
+.perf-pct{font-size:15px;opacity:.8}
+.perf-ranges{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--bg);
+  border:1px solid var(--ln)}
+.perf-ranges button{height:30px;padding:0 14px;border-radius:999px;border:none;background:none;
+  font-size:13px;color:var(--ink3)}
+.perf-ranges button:hover{color:var(--ink)}
+.perf-ranges button.on{background:var(--s3);color:var(--ink)}
+.eq-host{height:280px;margin:14px -8px 0}
+
+.ptiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  margin:8px -22px 0;border-top:1px solid var(--ln)}
+.ptile{padding:16px 22px;border-right:1px solid var(--ln)}
+.ptile:last-child{border-right:none}
+.ptile-label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.ptile-value{font-size:19px;margin-top:7px;letter-spacing:-.01em}
+.ptile-sub{font-size:11.5px;color:var(--ink3);margin-top:4px}
+
+.pcard{margin-top:22px;border:1px solid var(--ln);border-radius:20px;background:var(--s1);
+  overflow:hidden}
+.pcard-body{padding:4px 0 8px;overflow-x:auto}
+.pacct{display:flex;flex-direction:column;gap:10px;padding:18px 22px}
+.pacct p{margin:6px 0 4px;font-size:13px;color:var(--ink3);line-height:1.6;max-width:62ch}
+@media (max-width:700px){
+  .perf{padding:16px 16px 4px}
+  .eq-host{height:220px}
+  .ptiles{margin:8px -16px 0;grid-template-columns:repeat(2,1fr)}
+  .ptile{border-bottom:1px solid var(--ln);padding:14px 16px}
+}
 
 /* ================= documentation + open index ================= */
 .doc{display:grid;grid-template-columns:240px minmax(0,1fr);gap:56px;
