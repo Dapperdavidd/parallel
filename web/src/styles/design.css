@@ -713,10 +713,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 .app .act-hint{background:#131930;border-color:var(--ln2)}
 .app .btn-ghost{border-color:var(--ln2);background:#ffffff05}
 .app .btn-ghost:hover{border-color:#333C59}
-/* A faint cobalt wash from the top so the screen isn't a flat field. */
-.app::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+/* A faint cobalt wash from the top so the screen isn't a flat field.
+   `isolation` keeps the -1 inside .app's own stacking context, so the wash
+   sits behind the shell's content without flattening the children's z-order.
+   Giving every child z-index:1 instead put the fixed mobile tab bar — which
+   lives inside the header — underneath the main column. */
+.app{isolation:isolate}
+.app::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:radial-gradient(120% 70% at 50% -10%,rgba(61,92,245,.13),rgba(61,92,245,0) 60%)}
-.app > *{position:relative;z-index:1}
 
 /* ================= portfolio balance block ================= */
 .bal{padding:34px 0 0}
@@ -956,3 +960,52 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 /* Panels get a faint top-lit gradient so the screen reads as stacked
    surfaces rather than one flat field. */
 .app .panel,.app .feed,.app .bpanel{background:linear-gradient(#ffffff05,#ffffff00 120px)}
+
+/* ================= mobile site nav ================= */
+/* Below the breakpoint the centred pill cannot fit, so the same links move
+   into a sheet. The sign-in button stays in the bar — it is the one thing a
+   visitor should never have to open a menu to find. */
+.navburger{display:none;width:42px;height:42px;align-items:center;justify-content:center;
+  border-radius:999px;border:1px solid var(--ln2);background:rgba(22,22,24,.72);color:var(--ink)}
+.navburger:hover{background:#ffffff14}
+
+/* Fully opaque: at 97% a bright hero frame still reads through, and menu
+   text over moving video is unreadable. */
+.navsheet{position:fixed;left:0;right:0;top:var(--top-h,70px);bottom:0;z-index:39;
+  background:#08080A;overflow-y:auto;overscroll-behavior:contain;
+  animation:sheet-in .18s ease-out}
+@keyframes sheet-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.navsheet-inner{display:flex;flex-direction:column;padding:12px 20px 48px;max-width:560px;margin:0 auto}
+.navsheet-inner > a{padding:14px 2px;font-size:19px;font-weight:500;color:var(--ink);
+  border-bottom:1px solid var(--ln)}
+.navsheet-group{display:flex;flex-direction:column;margin-top:26px}
+.navsheet-group .doc-nav-title{padding:0 2px 8px}
+.navsheet-group a{padding:11px 2px;font-size:15.5px;color:var(--ink2);
+  border-bottom:1px solid var(--ln)}
+.navsheet-group a:active{color:var(--ink)}
+/* With the sheet open the bar must match it, or the mark sits on bright
+   video above a black menu. */
+.site-top .lnav.sheet-open{background:#08080A;border-bottom:1px solid var(--ln)}
+
+/* On a phone the app bar cannot carry the balance as well as Add money and
+   the settings icons — it ran off the right edge. The balance is the first
+   thing on the page below, so the chip keeps only the avatar. */
+@media (max-width:620px){
+  .acct{padding:0;border:none;background:none}
+  .acct .mono{display:none}
+  .atop{gap:8px;padding:0 12px}
+  .btn-add{padding:0 12px}
+}
+
+@media (max-width:860px){
+  .navburger{display:inline-flex}
+  /* The sheet replaces the dropdown entirely, so close the desktop one. */
+  .navdrop-menu{display:none}
+}
+@media (max-width:420px){
+  /* On the narrowest phones the full label pushes the burger off the bar. */
+  .nav-right .btn-light{padding:0 14px;font-size:14px}
+}
+
+/* The app's bottom tab bar predates the cobalt surface; keep it in step. */
+.app .atabs{background:#0A0E1C;border-top-color:var(--ln)}

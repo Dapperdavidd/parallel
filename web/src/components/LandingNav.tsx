@@ -5,6 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { Brand } from "./Brand";
 import { DOC_GROUPS } from "@/app/docs/nav";
 
+const LINKS: [string, string][] = [
+  ["/#markets", "Markets"],
+  ["/#features", "Product"],
+  ["/app/trade", "Trade"],
+];
+
 /**
  * Landing nav: mark on the left, links centred, sign-in on the right.
  *
@@ -12,9 +18,14 @@ import { DOC_GROUPS } from "@/app/docs/nav";
  * — no sign-in required to look around; the app shows "Connect" until you
  * actually need a wallet. "Docs" opens a menu, because there are two quite
  * different things under it: the plain-English guide and the reference.
+ *
+ * Below 860px the centred pill does not fit, so the same links move into a
+ * sheet behind a burger. The sign-in button stays in the bar either way —
+ * it is the one thing a visitor should never have to open a menu to find.
  */
 export function LandingNav() {
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
   // Close on a click elsewhere or on Escape — a menu you cannot dismiss is a
@@ -35,14 +46,44 @@ export function LandingNav() {
     };
   }, [open]);
 
+  // The sheet covers the page, so the page behind it must not scroll, and
+  // Escape must get you out.
+  useEffect(() => {
+    if (!sheet) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") setSheet(false);
+    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      removeEventListener("keydown", onKey);
+    };
+  }, [sheet]);
+
+  // A viewport that grows past the breakpoint while the sheet is open would
+  // leave it stranded over the desktop layout.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width:861px)");
+    const onChange = (): void => {
+      if (mq.matches) setSheet(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   return (
-    <header className="lnav">
+    <header className={`lnav${sheet ? " sheet-open" : ""}`}>
       <nav aria-label="Main">
         <Brand />
+
         <div className="navpill">
-          <Link href="/#markets">Markets</Link>
-          <Link href="/#features">Product</Link>
-          <Link href="/app/trade">Trade</Link>
+          {LINKS.map(([href, label]) => (
+            <Link key={href} href={href}>
+              {label}
+            </Link>
+          ))}
 
           <div className="navdrop" ref={wrap}>
             <button
@@ -87,12 +128,56 @@ export function LandingNav() {
             )}
           </div>
         </div>
+
         <div className="nav-right">
+          <button
+            type="button"
+            className="navburger"
+            aria-expanded={sheet}
+            aria-controls="nav-sheet"
+            aria-label={sheet ? "Close menu" : "Open menu"}
+            onClick={() => setSheet((v) => !v)}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+              {sheet ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+            </svg>
+          </button>
+
           <Link href="/signin" className="btn btn-light" style={{ height: 42 }}>
             Sign in / Sign up
           </Link>
         </div>
       </nav>
+
+      {sheet && (
+        <div className="navsheet" id="nav-sheet">
+          <div className="navsheet-inner">
+            {LINKS.map(([href, label]) => (
+              <Link key={href} href={href} onClick={() => setSheet(false)}>
+                {label}
+              </Link>
+            ))}
+
+            {DOC_GROUPS.map((g) => (
+              <div key={g.title} className="navsheet-group">
+                <div className="doc-nav-title">{g.title.toUpperCase()}</div>
+                {g.pages.map((p) => (
+                  <Link key={p.href} href={p.href} onClick={() => setSheet(false)}>
+                    {p.label}
+                  </Link>
+                ))}
+              </div>
+            ))}
+
+            <div className="navsheet-group">
+              <div className="doc-nav-title">MORE</div>
+              <Link href="/open-index" onClick={() => setSheet(false)}>
+                Open index
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

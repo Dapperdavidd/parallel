@@ -62,7 +62,11 @@ if (STATE) {
 await send("Page.navigate", { url: URL_ });
 await sleep(5000);
 
-const { result } = await send("Runtime.evaluate", { expression: EXPR, returnByValue: true });
+// awaitPromise lets the expression be async — without it a Promise comes back
+// as an empty object, which looks like a failed query rather than a pending one.
+const { result } = await send("Runtime.evaluate", {
+  expression: EXPR, returnByValue: true, awaitPromise: true,
+});
 console.log(typeof result.result.value === "string"
   ? result.result.value
   : JSON.stringify(result.result.value, null, 1));
