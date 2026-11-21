@@ -121,7 +121,7 @@ export function Hero() {
           <div className="logo-shadow" />
           <div className="logo-bob">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/media/parallel-logo-thick-glass.png" alt="" />
+            <img src="/media/parallel-logo-glass.png" alt="" />
             <div className="logo-sweep" />
           </div>
         </div>
