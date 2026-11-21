@@ -77,6 +77,13 @@ svg{flex:none}
 .mrow{display:grid;grid-template-columns:minmax(220px,2.2fr) minmax(80px,.8fr) minmax(110px,1fr) minmax(110px,1fr) minmax(110px,1fr) minmax(130px,1fr);align-items:center;gap:16px;padding:20px 28px;border-top:1px solid var(--ln);min-width:900px}
 a.mrow:hover{background:#ffffff06}
 .mrow.head{border-top:none;padding:22px 28px 14px;font-size:12px;letter-spacing:.08em;color:var(--ink3)}
+/* On a phone only the three columns that matter survive, and the row stops
+   being a horizontal scroller. */
+@media (max-width:620px){
+  .mrow{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,.7fr);
+    min-width:0;gap:10px;padding:14px 16px}
+  .mrow.head{padding:16px 16px 10px}
+}
 .cur{width:44px;height:44px;flex:none;border-radius:999px;background:var(--s3);border:1px solid var(--ln2);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px}
 .cur.sm{width:32px;height:32px;font-size:12px}
 .status{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 13px;border-radius:999px;border:1px solid var(--ln2);font-size:14px}
@@ -760,3 +767,51 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 .idx-foot b{color:var(--ink2);font-weight:500}
 .idx-link{margin-top:4px;font-size:13px;color:var(--pri-t)}
 .idx-link:hover{color:#9DB0FF}
+
+/* ================= intro: hero shrinks into the markets card ================= */
+.intro{position:relative;height:240svh}
+@supports not (height:240svh){.intro{height:240vh}}
+.intro-stage{position:sticky;top:0;height:100svh;overflow:hidden;background:var(--bg)}
+@supports not (height:100svh){.intro-stage{height:100vh}}
+
+/* The heading the card settles beneath. It occupies exactly the band the
+   script reserves above the card (--head-h), and sits at the bottom of that
+   band, so it can never collide with the nav above or the card below however
+   short the viewport is. */
+.intro-head{position:absolute;left:0;right:0;top:0;height:var(--head-h,252px);z-index:2;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:14px;
+  text-align:center;padding:var(--top-h,70px) 24px 28px;opacity:var(--head-o,0);
+  pointer-events:none;transition:opacity .12s linear}
+.intro-head .h2{margin:0;font-size:clamp(34px,5.2vw,64px);line-height:1.04}
+/* On a short viewport the reserved band only has room for the headline. */
+@media (max-height:780px){.intro-head .pill-tag{display:none}}
+
+/* One rectangle, two contents. */
+.intro-frame{position:absolute;inset:0;overflow:hidden;z-index:3;background:#0B0B0C;
+  will-change:inset,border-radius}
+.intro-video{position:absolute;inset:0;opacity:var(--video-o,1)}
+.intro-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:60% 50%}
+.intro-video::after{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
+  pointer-events:none;background:linear-gradient(0deg,rgba(11,11,12,.86),rgba(11,11,12,.30) 46%,rgba(11,11,12,0))}
+.intro-video .logo-float{opacity:var(--logo-o,1)}
+.intro-video .hero-copy{opacity:var(--copy-o,1)}
+
+.intro-table{position:absolute;inset:0;opacity:var(--table-o,0);overflow:auto;
+  background:#0F0F11;border:1px solid var(--ln2);border-radius:inherit;
+  display:flex;align-items:center}
+.intro-table .mtable{width:100%;background:none;border-radius:0}
+.intro-table .mrow{padding:16px 26px}
+
+/* Reduced motion: no scroll choreography, just the two blocks stacked. */
+.intro-static{height:auto}
+.intro-static .intro-stage{position:static;height:auto}
+.intro-static .intro-head{position:static;height:auto;opacity:1;padding:90px 24px 26px}
+.intro-static .intro-frame{position:static;height:82svh}
+.intro-static .intro-video{opacity:1}
+.intro-static .intro-table{position:static;opacity:1;margin:24px auto;max-width:1180px}
+
+@media (max-width:900px){
+  .intro{height:200svh}
+  .intro-head{padding-bottom:18px;gap:10px}
+  .intro-table .mrow{padding:13px 16px}
+}

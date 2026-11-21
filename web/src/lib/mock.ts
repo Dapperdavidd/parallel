@@ -62,8 +62,11 @@ export const MARKETS: Market[] = [
   { c: "KES", sym: "KSh", name: "Kenyan shilling",     px:  130.64, off:  130.00, lev: 2, st: "Beta", reg: "Africa",        dp: 2, src: ["Binance P2P", "OKX P2P"],                  unitSize: 100,  unitLabel: "100KES" },
 ];
 
-/** Shown in the landing table — a representative slice, not all 13. */
-export const LANDING_ROWS = ["NGN", "ARS", "INR", "TRY", "GHS", "PKR", "EGP", "KES"];
+/**
+ * The landing table is a slice, not all 13 — it has to fit inside the intro
+ * card at its final size, which is what makes the hero transition work.
+ */
+export const LANDING_ROWS = ["NGN", "ARS", "INR", "TRY", "GHS", "KES"];
 
 export const byCode = (c: string): Market =>
   MARKETS.find((m) => m.c === c) ?? MARKETS[0]!;

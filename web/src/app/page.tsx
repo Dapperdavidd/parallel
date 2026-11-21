@@ -1,49 +1,18 @@
 import Link from "next/link";
 import { SiteTop } from "@/components/SiteTop";
-import { Hero } from "@/components/Hero";
-import { MarketRows } from "@/components/MarketsTable";
+import { IntroStage } from "@/components/IntroStage";
 import { FeatureScroll } from "@/components/FeatureScroll";
 import { CtaCanvas } from "@/components/CtaCanvas";
 import { Footer } from "@/components/Footer";
-import { LANDING_ROWS } from "@/lib/mock";
 
 export default function HomePage() {
   return (
     <main id="main">
       {/* Persistent: the nav stays visible for the whole page. */}
       <SiteTop />
-      <Hero />
+      <IntroStage />
 
-      {/* Everything below slides up OVER the pinned hero as it zooms out, so
-          the handover happens with no empty stretch in between. */}
       <div className="after-hero">
-      <section className="sec" id="markets">
-        <div className="wrap center">
-          <span
-            className="pill-tag"
-            style={{ border: "1px solid #3D5CF566", background: "#3D5CF514", color: "var(--pri-t)" }}
-          >
-            Street-rate index
-          </span>
-          <h2 className="h2">Two prices. Trade the real one.</h2>
-          <p className="lead">
-            Every market tracks what people really pay for dollars on the street, checked
-            against the official rate every two minutes.
-          </p>
-          <div className="glowbox">
-            <div className="glowframe">
-              <div className="mtable">
-                <MarketRows codes={LANDING_ROWS} />
-              </div>
-            </div>
-          </div>
-          <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--ink3)" }}>
-            Live markets use 3+ price sources and up to 5x. Beta markets use 2 sources and up
-            to 2x. Devnet test funds only.
-          </p>
-        </div>
-      </section>
-
       <FeatureScroll />
 
       <section style={{ padding: "120px 24px 40px" }}>

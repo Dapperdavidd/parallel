@@ -34,11 +34,11 @@ export function MarketRows({ codes }: { codes: string[] }) {
     <>
       <div className="mrow head">
         <span>MARKET</span>
-        <span>MAX LEVERAGE</span>
+        <span className="hide-sm">MAX LEVERAGE</span>
         <span>STREET PRICE</span>
         <span>VS OFFICIAL</span>
-        <span>STATUS</span>
-        <span style={{ textAlign: "right" }}>REGION</span>
+        <span className="hide-sm">STATUS</span>
+        <span className="hide-sm" style={{ textAlign: "right" }}>REGION</span>
       </div>
       {codes.map((c) => {
         const m = byCode(c);
@@ -52,16 +52,16 @@ export function MarketRows({ codes }: { codes: string[] }) {
                 <span style={{ fontSize: 13, color: "var(--ink3)" }}>{m.name}</span>
               </span>
             </span>
-            <span className="mono">{m.lev}x</span>
+            <span className="mono hide-sm">{m.lev}x</span>
             <span className="mono">{fmt(m.px, m.dp)}</span>
             <span className="mono" style={{ color: p >= 0 ? "var(--amb)" : "var(--ink2)" }}>
               {p >= 0 ? "+" : ""}
               {p.toFixed(1)}%
             </span>
-            <span>
+            <span className="hide-sm">
               <StatusPill m={m} />
             </span>
-            <span style={{ textAlign: "right", color: "var(--ink2)", fontSize: 14 }}>
+            <span className="hide-sm" style={{ textAlign: "right", color: "var(--ink2)", fontSize: 14 }}>
               {m.reg}
             </span>
           </Link>
