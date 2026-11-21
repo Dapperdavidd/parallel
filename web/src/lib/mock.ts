@@ -214,6 +214,100 @@ export const LAST_PUSH_SECONDS_AGO = 47;
  * Landing page copy that varies
  * ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ *
+ * Market statistics shown in the trade header.
+ * Deterministic per market so the screen is stable between reloads.
+ * Phase 3 reads these from the market account and the index service.
+ * ------------------------------------------------------------------ */
+
+export interface MarketStats {
+  /** The engine's effective price — what positions are marked against. */
+  mark: number;
+  /** The index median. The mark walks toward it, so they can differ. */
+  index: number;
+  change24hPct: number;
+  volume24hUsd: number;
+  openInterestUsd: number;
+  /** Funding per hour, in percent. Positive means longs pay. */
+  fundingPct: number;
+  /** Seconds until the next funding settlement. */
+  fundingCountdownSec: number;
+}
+
+export function statsFor(m: Market): MarketStats {
+  let seed = m.c.charCodeAt(0) * 131 + m.c.charCodeAt(2) * 17;
+  const rnd = (): number => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  const drift = (rnd() - 0.5) * 0.0025;
+  return {
+    mark: m.px * (1 + drift),
+    index: m.px,
+    change24hPct: (rnd() - 0.38) * 2.6,
+    volume24hUsd: 40_000 + rnd() * 900_000,
+    openInterestUsd: 20_000 + rnd() * 400_000,
+    fundingPct: (rnd() - 0.45) * 0.03,
+    fundingCountdownSec: 3600 - (Math.floor(Date.now() / 1000) % 3600),
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Live trades.
+ *
+ * This fills the slot a Hyperliquid-style page gives the order book.
+ * Percolator settles against a matcher, not a central limit order book, so
+ * there IS no book to show — but every fill is real and on-chain, which is
+ * what this feed represents. See PHASE-1-REPORT.md.
+ * ------------------------------------------------------------------ */
+
+export interface TradeFill {
+  id: number;
+  side: "long" | "short";
+  /** Local currency per USD. */
+  price: number;
+  /** Notional in tUSDC. */
+  sizeUsd: number;
+  /** Seconds ago. */
+  ago: number;
+}
+
+export function recentTrades(m: Market, count = 30): TradeFill[] {
+  let seed = m.c.charCodeAt(1) * 977 + 13;
+  const rnd = (): number => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  const out: TradeFill[] = [];
+  let ago = 2;
+  for (let i = 0; i < count; i++) {
+    out.push({
+      id: i,
+      side: rnd() > 0.47 ? "long" : "short",
+      price: m.px * (1 + (rnd() - 0.5) * 0.0016),
+      sizeUsd: Math.round((40 + rnd() * 2400) / 10) * 10,
+      ago,
+    });
+    ago += Math.round(1 + rnd() * 40);
+  }
+  return out;
+}
+
+export function agoLabel(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+  return `${Math.floor(sec / 3600)}h`;
+}
+
+export function compactUsd(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+/** What the devnet faucet hands out per request. */
+export const DEVNET_TOPUP = 1_000;
+
 export const FEATURES: [string, string][] = [
   ["Trade perps", "Go long or short the dollar against your currency with up to 5x. Every trade settles on Solana."],
   ["Hedge your savings", "Hold naira? One tap protects its dollar value. No bank account, no forms."],

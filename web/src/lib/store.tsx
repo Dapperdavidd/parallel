@@ -25,6 +25,7 @@ import {
 import {
   byCode,
   positionPnl,
+  DEVNET_TOPUP,
   STARTING_BALANCE,
   TRADING_FEE_BPS,
   type Position,
@@ -54,6 +55,8 @@ interface Store extends DemoState {
   signOut: () => void;
   openPosition: (p: Omit<Position, "id">) => void;
   closePosition: (id: number) => number;
+  /** Request the devnet faucet minimum. */
+  topUp: () => number;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -119,14 +122,23 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     return realised;
   }, []);
 
+  /**
+   * Add money: on devnet this is a faucet request, not a deposit of anything
+   * real. Phase 3 calls the mint authority; here it just credits the balance.
+   */
+  const topUp = useCallback((): number => {
+    setS((p) => ({ ...p, balance: p.balance + DEVNET_TOPUP }));
+    return DEVNET_TOPUP;
+  }, []);
+
   const openPnl = useMemo(
     () => s.positions.reduce((a, p) => a + positionPnl(p), 0),
     [s.positions],
   );
 
   const value = useMemo<Store>(
-    () => ({ ...s, ready, openPnl, setMarket, signIn, signOut, openPosition, closePosition }),
-    [s, ready, openPnl, setMarket, signIn, signOut, openPosition, closePosition],
+    () => ({ ...s, ready, openPnl, setMarket, signIn, signOut, openPosition, closePosition, topUp }),
+    [s, ready, openPnl, setMarket, signIn, signOut, openPosition, closePosition, topUp],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

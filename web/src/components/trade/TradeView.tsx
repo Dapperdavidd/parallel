@@ -2,122 +2,70 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { MARKETS, byCode, fmt, premium } from "@/lib/mock";
+import { byCode } from "@/lib/mock";
 import { useDemo } from "@/lib/store";
 import { PriceChart, TIMEFRAMES, type Timeframe } from "@/components/PriceChart";
-import { CurrencyBadge } from "@/components/MarketsTable";
+import { MarketSelect } from "./MarketSelect";
+import { MarketStats } from "./MarketStats";
+import { TradesFeed } from "./TradesFeed";
 import { TradeTicket } from "./TradeTicket";
-import { PositionsTable } from "./PositionsTable";
+import { BottomPanel } from "./BottomPanel";
 
+/**
+ * The trade screen.
+ *
+ * Laid out the way a working perps terminal is: market picker and stats across
+ * the top, chart filling the middle, live trades beside it, the order ticket
+ * on the right, and positions/balances/history docked at the bottom.
+ *
+ * Where a conventional venue puts an order book, we put the trades feed —
+ * Percolator settles against a matcher, not a central limit order book, so a
+ * book would be invented liquidity.
+ */
 export function TradeView() {
   const params = useSearchParams();
   const { market: stateMarket, setMarket, positions } = useDemo();
   const [tf, setTf] = useState<Timeframe>("1H");
 
-  // A ?m= link from the landing table wins over whatever was last selected.
   const requested = params.get("m");
   useEffect(() => {
     if (requested && requested !== stateMarket) setMarket(requested);
   }, [requested, stateMarket, setMarket]);
 
   const m = byCode(requested ?? stateMarket);
-  const p = premium(m);
 
   return (
-    <div className="tgrid" style={{ flex: 1 }}>
-      <aside className="panel mlistp">
-        <div
-          style={{
-            padding: "14px 16px",
-            fontSize: 12,
-            letterSpacing: ".08em",
-            color: "var(--ink3)",
-            borderBottom: "1px solid var(--ln)",
-          }}
-        >
-          MARKETS
-        </div>
-        <div className="mlist">
-          {MARKETS.map((x) => (
-            <button
-              key={x.c}
-              type="button"
-              className={x.c === m.c ? "on" : undefined}
-              onClick={() => setMarket(x.c)}
-            >
-              <CurrencyBadge m={x} small />
-              <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                <b style={{ fontWeight: 500, fontSize: 14 }}>USD/{x.c}</b>
-                <span style={{ fontSize: 11, color: "var(--ink3)" }}>
-                  {x.lev}x · {x.st}
-                </span>
-              </span>
-              <span
-                className="mono"
-                style={{ marginLeft: "auto", fontSize: 13, color: "var(--ink2)" }}
+    <div className="tpage">
+      <div className="thead">
+        <MarketSelect market={m} />
+        <MarketStats market={m} />
+      </div>
+
+      <div className="tbody">
+        <section className="panel tchart">
+          <div className="tf">
+            {TIMEFRAMES.map((x) => (
+              <button
+                key={x}
+                type="button"
+                className={x === tf ? "on" : undefined}
+                onClick={() => setTf(x)}
               >
-                {fmt(x.px, x.dp)}
-              </span>
-            </button>
-          ))}
-        </div>
-      </aside>
+                {x}
+              </button>
+            ))}
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink3)", paddingRight: 4 }}>
+              Parallel street index · official rate dashed
+            </span>
+          </div>
 
-      <section className="panel" style={{ display: "flex", flexDirection: "column" }}>
-        <div className="mhead">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 600 }}>
-            <CurrencyBadge m={m} small />
-            USD/{m.c}
-          </div>
-          <div className="stat">
-            Street price<b style={{ fontSize: 18 }}>{fmt(m.px, m.dp)}</b>
-          </div>
-          <div className="stat">
-            Official<b>{fmt(m.off, m.dp)}</b>
-          </div>
-          <div className="stat">
-            Gap
-            <b style={{ color: "var(--amb)" }}>
-              {p >= 0 ? "+" : ""}
-              {p.toFixed(1)}% vs official
-            </b>
-          </div>
-          <div className="stat">
-            Max leverage<b>{m.lev}x</b>
-          </div>
-          <div className="stat">
-            Sources
-            <b style={{ fontFamily: "inherit" }}>
-              {m.src.length} · {m.st}
-            </b>
-          </div>
-          <div className="stat">
-            Contract<b>{m.unitLabel}</b>
-          </div>
-        </div>
+          <PriceChart market={m} timeframe={tf} positions={positions} />
+          <BottomPanel market={m} />
+        </section>
 
-        <div className="tf">
-          {TIMEFRAMES.map((x) => (
-            <button
-              key={x}
-              type="button"
-              className={x === tf ? "on" : undefined}
-              onClick={() => setTf(x)}
-            >
-              {x}
-            </button>
-          ))}
-        </div>
-
-        <PriceChart market={m} timeframe={tf} positions={positions} />
-
-        <div style={{ borderTop: "1px solid var(--ln)", overflowX: "auto" }}>
-          <div style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600 }}>Positions</div>
-          <PositionsTable />
-        </div>
-      </section>
-
-      <TradeTicket market={m} />
+        <TradesFeed market={m} />
+        <TradeTicket market={m} />
+      </div>
     </div>
   );
 }
