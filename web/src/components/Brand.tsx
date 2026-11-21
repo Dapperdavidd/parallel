@@ -1,9 +1,11 @@
 import Link from "next/link";
 
 /**
- * The Parallel mark: two slanted bars, amber and blue. Same geometry as the
- * glass logo but flat, for nav and footer use. Do not change the shape — the
- * design hand-off is explicit about that.
+ * The Parallel mark: two slanted bars, amber long and blue short.
+ *
+ * This is THE app logo — nav, footer, app shell, sign-in, everywhere.
+ * The glass version is used only on the landing hero, floating over the video.
+ * Do not swap one for the other.
  */
 export function Mark({ size = 28 }: { size?: number }) {
   return (

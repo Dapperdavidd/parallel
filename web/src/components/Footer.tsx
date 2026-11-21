@@ -23,7 +23,7 @@ export function Footer() {
   return (
     <footer
       className="wrap"
-      style={{ paddingTop: 120, paddingBottom: 48, display: "flex", flexDirection: "column", gap: 56 }}
+      style={{ paddingTop: 120, paddingBottom: 12, display: "flex", flexDirection: "column", gap: 48 }}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: 48, justifyContent: "space-between" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 380 }}>

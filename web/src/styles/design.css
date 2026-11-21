@@ -427,3 +427,75 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 .feat-screen{min-height:0;height:clamp(340px,44vh,440px)}
 .feat-text{min-height:0;height:clamp(180px,22vh,240px)}
 .feat-screen .mock{height:100%}
+
+/* ================= hero, revised ================= */
+/* The stage is sticky inside a taller track, so scrolling drives a zoom-out
+   instead of pushing the hero off screen. */
+.hero-track{position:relative;height:200svh}
+@supports not (height:200svh){.hero-track{height:200vh}}
+
+.hero-full{position:sticky;top:0;height:100svh;min-height:520px;overflow:hidden;
+  background:#0B0B0C;transform-origin:50% 50%;
+  will-change:transform,border-radius,opacity;display:block}
+@supports not (height:100svh){.hero-full{height:100vh}}
+
+/* No gradient wash over the footage — legibility comes from the text shadow. */
+.hero-scrim{display:none}
+
+/* Copy sits upper-left, stacked: headline on one line, then the line about
+   going long or short, then the button. */
+.hero-copy{position:absolute;left:0;right:auto;top:50%;bottom:auto;transform:translateY(-50%);
+  z-index:4;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  gap:22px;padding:0 0 0 clamp(22px,4.4vw,72px);max-width:min(880px,88vw);text-align:left}
+.hero-copy h1{font-size:clamp(34px,5.6vw,88px);line-height:1.02;letter-spacing:-.045em;margin:0;
+  text-shadow:0 2px 36px rgba(0,0,0,.6),0 1px 4px rgba(0,0,0,.4)}
+.hero-copy p{margin:0;font-size:clamp(15px,1.25vw,18px);line-height:1.6;color:#E2E2E5;
+  max-width:min(520px,100%);text-shadow:0 1px 18px rgba(0,0,0,.7)}
+.hero-copy > :first-child,.hero-copy > :last-child{flex:0 0 auto}
+
+/* The scroll cue is gone. */
+.hero-cue{display:none}
+
+/* Glass mark, clear of the copy on the right half of the stage. */
+.hero-full .logo-float{left:72%;top:44%;height:46%;z-index:3}
+@media (max-width:900px){
+  .hero-full .logo-float{left:50%;top:24%;height:20%}
+  .hero-copy{top:auto;bottom:0;transform:none;justify-content:flex-end;
+    padding:0 22px 44px;gap:16px;max-width:100%}
+}
+
+/* ================= persistent top panel ================= */
+/* The nav stays visible for the whole page. The hero is pulled up behind it so
+   the video still starts at the very top of the viewport. */
+.site-top{position:relative;z-index:40}
+.site-top .lnav{position:sticky;top:0;z-index:41;background:linear-gradient(#0B0B0Ccc,#0B0B0C55 60%,#0B0B0C00);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.site-top .topbanner{position:relative;z-index:42;background:#0B0B0C}
+.hero-track{margin-top:calc(-1 * var(--top-h,112px))}
+
+
+/* The top panel is FIXED, not sticky: sticky only holds while its parent is on
+   screen, so the nav slid away a hundred pixels into the page. Fixed takes it
+   out of flow entirely, so the hero also starts at the very top on its own and
+   needs no negative margin. */
+.site-top{position:fixed;top:0;left:0;right:0;z-index:40}
+.site-top .lnav{position:static}
+.hero-track{margin-top:0}
+
+/* Anchored sections must clear the fixed panel when jumped to. */
+#markets,#features,.feat-track > span{scroll-margin-top:var(--top-h,112px)}
+
+/* The devnet pill sits over bright footage; give it enough body to read. */
+.hero-copy .pill-tag{background:rgba(20,16,8,.55);border-color:#F2A93B88;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 2px 18px rgba(0,0,0,.35)}
+
+/* Solid backdrop once the page scrolls under the fixed panel. */
+.site-top.scrolled .lnav{background:rgba(11,11,12,.92);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--ln)}
+
+/* The wordmark closes the page; it does not need 300px of room plus the
+   footer's own bottom padding under it. */
+.wordmark{height:auto;padding:14px 0 0}
+.wordmark .wm{font-size:clamp(74px,15vw,210px)}

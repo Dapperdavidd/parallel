@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteTop } from "@/components/SiteTop";
 import { Hero } from "@/components/Hero";
 import { MarketRows } from "@/components/MarketsTable";
 import { FeatureScroll } from "@/components/FeatureScroll";
@@ -9,7 +10,8 @@ import { LANDING_ROWS } from "@/lib/mock";
 export default function HomePage() {
   return (
     <main id="main">
-      {/* The banner and nav now ride inside the hero, over the video. */}
+      {/* Persistent: the nav stays visible for the whole page. */}
+      <SiteTop />
       <Hero />
 
       <section className="sec" id="markets">
