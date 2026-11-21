@@ -1,5 +1,8 @@
 /** Small fetch helper: timeout, retry, and a browser UA for the P2P web APIs. */
 
+import { fetch, type RequestInit } from "undici";
+import { dispatcher } from "./resolver.js";
+
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/131.0 Safari/537.36";
@@ -22,10 +25,14 @@ export async function fetchJson<T = unknown>(
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     try {
-      const res = await fetch(url, {
+      // undici's own fetch, so the custom dispatcher is a first-class option
+      // rather than a cast past the global fetch's types.
+      const init: RequestInit = {
         signal: ac.signal,
         headers: { "User-Agent": UA, Accept: "application/json" },
-      });
+        dispatcher,
+      };
+      const res = await fetch(url, init);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       try {

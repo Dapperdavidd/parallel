@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Parallel \u2014 perpetual futures on emerging-market currencies, on Solana devnet via Percolator. Phase 1: feasibility scripts only.",
+  "description": "Parallel — perpetual futures on emerging-market currencies, on Solana devnet via Percolator. Phase 1: feasibility scripts only.",
   "engines": {
     "node": ">=20"
   },
@@ -18,13 +18,17 @@
     "inspect": "tsx src/spikes/inspect.ts",
     "spike7:fund": "tsx src/spikes/spike7-fund.ts",
     "spike7": "npm --prefix spike7 run dev",
-    "spike7:verify": "tsx src/spikes/spike7-verify.ts"
+    "spike7:verify": "tsx src/spikes/spike7-verify.ts",
+    "index": "tsx src/services/index-service.ts",
+    "balances": "tsx src/tools/balances.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.98.0",
+    "@supabase/supabase-js": "^2.119.2",
     "bs58": "^6.0.0",
-    "dotenv": "^17.2.4"
+    "dotenv": "^17.2.4",
+    "undici": "^8.13.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
