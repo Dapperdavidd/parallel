@@ -8,10 +8,15 @@ wallets/
 id.json
 
 # ---- local-only working notes ----
-# DECISIONS.md is the full agent-handoff decision log. It stays local by the
-# user's explicit instruction (2026-11-20): the next agent runs on this same
-# Mac and reads the folder directly, so it does not need to travel via git.
+# DECISIONS.md
+
+# DECISIONS.md is the full agent-handoff decision log, and HANDOFF.md is the
+# cold-start brief that points at it. Both stay local by the user's explicit
+# instruction (2026-11-20): the next agent runs on this same Mac and reads the
+# folder directly, so neither needs to travel via git — and neither belongs in
+# a repo the user pushes.
 DECISIONS.md
+HANDOFF.md
 
 # ---- cloned upstream reference repos (read-only research) ----
 reference/
