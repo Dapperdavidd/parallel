@@ -434,6 +434,30 @@ export function notionalAtoms(sizeQ: bigint, priceE6: bigint): bigint {
   return (n * priceE6) / POS_SCALE;
 }
 
+/**
+ * Funding cap, in e9 per slot. IMMUTABLE after InitMarket.
+ *
+ * Phase 1 left this at 0 (funding off) because `FUNDING_DEN` was not in any
+ * checked-out repo and a wrong immutable guess is expensive. It is now read
+ * from the real source — percolator @ add1d02, `FUNDING_DEN = 1_000_000_000`
+ * — so the arithmetic can be done rather than guessed:
+ *
+ *   premium_e9 = |mark − index| × 1e9 / index        (a fraction, scaled 1e9)
+ *   rate_e9    = min(premium_e9, max_abs_funding_e9_per_slot), signed
+ *   funding    = notional × rate_e9 / 1e9   per slot
+ *
+ * Solana targets 400 ms slots, so 9,000 slots an hour. For a ceiling of
+ * 0.05%/hour:  0.0005 × 1e9 / 9000 = 55.6  →  56.
+ *
+ * In AuthMark mode the premium is the gap between the mark we push and the
+ * engine's effective price, which closes at max_price_move_bps_per_slot. The
+ * gap is therefore wide only for the few slots after a push, so the cap binds
+ * during catch-up and funding is zero between pushes. That is the correct
+ * shape: funding compensates for the engine's lag behind our index, and
+ * nothing else.
+ */
+export const MAX_ABS_FUNDING_E9_PER_SLOT = 56n;
+
 export const MAX_PRICE_MOVE_BPS_PER_SLOT = 24n;
 export const MAX_ACCRUAL_DT_SLOTS = 10n;
 export const LIQUIDATION_FEE_BPS = 5n;
