@@ -1,35 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { TopBanner, LandingNav } from "./LandingNav";
+import { LandingNav } from "./LandingNav";
 
 /**
- * The persistent top panel: banner plus nav, visible for the whole page.
+ * The persistent top panel.
  *
- * The hero is pulled up behind this block (`.hero-track` has a negative
- * margin) so the video still starts at the very top of the viewport. That
- * offset has to match this block's real height, which changes when the banner
- * text wraps on a phone, so it is measured rather than hard-coded.
+ * Over the hero it is completely bare — no glass, no blur, no panel — so the
+ * mark and links simply sit on the video. It only takes on a background once
+ * the page has scrolled far enough that content would otherwise run underneath
+ * it, and it fades in rather than snapping to black.
  */
 export function SiteTop() {
   const ref = useRef<HTMLDivElement>(null);
-  const [scrolled, setScrolled] = useState(false);
+  const [solid, setSolid] = useState(0);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+
     const set = (): void => {
       document.documentElement.style.setProperty("--top-h", `${el.offsetHeight}px`);
     };
     set();
     const ro = new ResizeObserver(set);
     ro.observe(el);
-    addEventListener("resize", set);
-    // Over the hero the panel is glass on video; once content starts passing
-    // underneath it needs a solid backdrop or the type collides.
-    const onScroll = (): void => setScrolled(window.scrollY > 40);
+
+    // Ramp the backdrop in across the second half of the hero rather than
+    // flipping it on, so the panel never appears to "go black".
+    const onScroll = (): void => {
+      const h = window.innerHeight || 1;
+      setSolid(Math.min(1, Math.max(0, (window.scrollY - h * 0.55) / (h * 0.45))));
+    };
     onScroll();
     addEventListener("scroll", onScroll, { passive: true });
+    addEventListener("resize", set);
 
     return () => {
       ro.disconnect();
@@ -39,8 +44,15 @@ export function SiteTop() {
   }, []);
 
   return (
-    <div className={`site-top${scrolled ? " scrolled" : ""}`} ref={ref}>
-      <TopBanner />
+    <div
+      className="site-top"
+      ref={ref}
+      style={
+        {
+          "--solid": solid,
+        } as React.CSSProperties
+      }
+    >
       <LandingNav />
     </div>
   );

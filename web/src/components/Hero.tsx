@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from "react";
  */
 export function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLElement>(null);
   const [reduced, setReduced] = useState(false);
 
   useEffect(() => {
@@ -67,11 +67,9 @@ export function Hero() {
     let raf = 0;
     const apply = (): void => {
       raf = 0;
-      const track = stage.parentElement;
-      if (!track) return;
-      const total = track.offsetHeight - window.innerHeight;
-      if (total <= 0) return;
-      const p = Math.min(1, Math.max(0, -track.getBoundingClientRect().top / total));
+      const vh = window.innerHeight || 1;
+      // The zoom runs over the first viewport of scrolling.
+      const p = Math.min(1, Math.max(0, window.scrollY / vh));
       const ease = p * p * (3 - 2 * p); // smoothstep
 
       // Shrink toward the width of the content column below, and round off,
@@ -79,10 +77,11 @@ export function Hero() {
       // Shrink to roughly the width of the card in the section below, round
       // off, then hand over: the last stretch fades the stage out so the next
       // section's card appears to be what the video became.
-      stage.style.transform = `scale(${1 - ease * 0.14})`;
+      stage.style.transform = `scale(${1 - ease * 0.16})`;
       stage.style.borderRadius = `${ease * 30}px`;
-      const handoff = Math.max(0, (ease - 0.72) / 0.28);
-      stage.style.opacity = `${1 - handoff}`;
+      stage.style.opacity = `${1 - ease * 0.35}`;
+      // Nothing to paint once it is fully covered.
+      stage.style.visibility = p >= 1 ? "hidden" : "visible";
 
       const copy = stage.querySelector<HTMLElement>(".hero-copy");
       if (copy) copy.style.opacity = `${1 - Math.min(1, ease * 2.6)}`;
@@ -102,8 +101,7 @@ export function Hero() {
   }, [reduced]);
 
   return (
-    <section className="hero-track" aria-label="Hero">
-      <div className="hero-full" ref={stageRef}>
+    <section className="hero-full" aria-label="Hero" ref={stageRef}>
         <video
           ref={videoRef}
           autoPlay
@@ -160,7 +158,6 @@ export function Hero() {
             </div>
           </div>
         </div>
-      </div>
     </section>
   );
 }

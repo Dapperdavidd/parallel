@@ -43,20 +43,23 @@ export function Footer() {
           <div>
             <h4>Trade</h4>
             <Link href="/app/markets">Markets</Link>
-            <Link href="/app/trade">USD/NGN</Link>
+            <Link href="/app/trade?m=NGN">USD/NGN</Link>
             <Link href="/app/hedge">Hedge mode</Link>
           </div>
           <div>
             <h4>Learn</h4>
-            <Link href="/#markets">How prices work</Link>
-            <Link href="/#features">The app</Link>
-            <Link href="/#risk">Risk</Link>
+            <Link href="/learn#prices">How prices work</Link>
+            <Link href="/learn#trading">How trading works</Link>
+            <Link href="/learn#hedging">How hedging works</Link>
+            <Link href="/learn#app">The app</Link>
+            <Link href="/learn#faq">Questions</Link>
           </div>
           <div>
             <h4>Parallel</h4>
-            <Link href="/">About</Link>
+            <Link href="/learn#about">About</Link>
+            <Link href="/open-index">Open index</Link>
+            <Link href="/learn#risks">Risk disclosure</Link>
             <Link href="/signin">Sign in / Sign up</Link>
-            <Link href="/#risk">Risk disclosure</Link>
           </div>
         </div>
       </div>
@@ -69,20 +72,20 @@ export function Footer() {
             <span style={{ fontSize: 14, color: "var(--ink2)" }}>13 markets on devnet</span>
           </span>
         </Link>
-        <div className="tile">
+        <Link href="/open-index" className="tile">
           <TileIcon d="M12 3v18M5 8h14M5 16h14" stroke="#A1A1A6" />
           <span>
             <b style={{ display: "block", fontWeight: 500 }}>Open index</b>
             <span style={{ fontSize: 14, color: "var(--ink2)" }}>Every source, published</span>
           </span>
-        </div>
-        <div className="tile">
+        </Link>
+        <Link href="/learn#risks" className="tile">
           <TileIcon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#A1A1A6" />
           <span>
             <b style={{ display: "block", fontWeight: 500 }}>Devnet only</b>
             <span style={{ fontSize: 14, color: "var(--ink2)" }}>Test money, no risk</span>
           </span>
-        </div>
+        </Link>
       </div>
 
 
@@ -100,8 +103,8 @@ export function Footer() {
       >
         <span>© 2026 Parallel</span>
         <span style={{ display: "flex", gap: 20 }}>
-          <Link href="/#risk">Risk</Link>
-          <Link href="/#markets">Markets</Link>
+          <Link href="/learn#risks">Risk</Link>
+          <Link href="/app/markets">Markets</Link>
           <Link href="/signin">Sign in</Link>
         </span>
       </div>

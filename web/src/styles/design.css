@@ -616,3 +616,147 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 
 @media (max-width:1180px){.tbody{grid-template-columns:minmax(0,1fr) 290px}.feed{display:none}}
 @media (max-width:860px){.tbody{display:block}.tchart{min-height:70vh}.ticket{border-top:1px solid var(--ln)}}
+
+/* ================= hero reveal + bare top panel ================= */
+/* No banner any more; the panel is just the nav. Over the hero it is bare —
+   no glass, no blur — and the backdrop ramps in via --solid as you scroll,
+   rather than snapping to black. */
+.site-top{position:fixed;top:0;left:0;right:0;z-index:40}
+.site-top .lnav,
+.site-top.scrolled .lnav{
+  position:static;border-bottom:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+  background:linear-gradient(#0B0B0C,#0B0B0C) ;
+  background-color:rgba(11,11,12,calc(0.92 * var(--solid,0)));
+  background-image:none;
+  box-shadow:0 1px 0 rgba(34,34,37,var(--solid,0));
+  transition:box-shadow .2s}
+.site-top .navpill{background:none;border:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+.site-top .navpill a{color:#EDEDEF;font-weight:500}
+.site-top .navpill a:hover{background:rgba(255,255,255,.1);color:#fff}
+
+/* Mark left, links centred, button right. */
+.lnav nav{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px}
+.lnav .nav-right{justify-self:end}
+.lnav .navpill{justify-self:center}
+@media (max-width:860px){
+  .lnav nav{grid-template-columns:auto 1fr}
+  .lnav .navpill{display:none}
+}
+
+/* The hero pins while the rest of the page rides up over it. */
+.hero-full{position:sticky;top:0;height:100svh;min-height:520px;overflow:hidden;
+  background:#0B0B0C;transform-origin:50% 50%;z-index:1;
+  will-change:transform,border-radius,opacity}
+@supports not (height:100svh){.hero-full{height:100vh}}
+.hero-track{display:contents}
+.after-hero{position:relative;z-index:2;background:var(--bg)}
+
+/* Over the video the panel has no backdrop, so the type needs its own
+   legibility. The shadow fades out as the solid backdrop fades in. */
+.site-top .brand,
+.site-top .navpill a{text-shadow:0 1px 14px rgba(0,0,0,calc(0.85 * (1 - var(--solid,0))))}
+
+/* The wordmark runs the full width of the page, not a centred block. */
+.wordmark{padding:10px 0 0}
+.wordmark:before{left:10%;right:10%}
+.wm{font-size:clamp(70px,19.2vw,420px);letter-spacing:-.055em;width:100%;text-align:center}
+
+/* Break the wordmark out of the footer's max-width so it really does run the
+   full width of the screen. */
+.wordmark{width:100vw;margin-left:calc(50% - 50vw);padding:6px 0 0;overflow:hidden}
+.wordmark:before{left:16%;right:16%}
+.wm{font-size:clamp(66px,28.5vw,470px);letter-spacing:-.06em;line-height:.92}
+
+/* Tuned so "Parallel FX" actually reaches both edges. */
+.wm{font-size:clamp(66px,44vw,760px)}
+
+/* ================= app accent: cobalt, not amber ================= */
+/* Inside the app the amber is reserved for genuine warnings; cobalt carries
+   the brand. Scoped to .app so the landing page is untouched. */
+.app{--accent:var(--pri);--accent-t:var(--pri-t);--accent-soft:#3D5CF51f}
+.app .chip{border-color:#3D5CF566;color:var(--pri-t)}
+.app .fcols h4{color:var(--pri-t)}
+.app .av{background:linear-gradient(135deg,#3D5CF5,#7B93FF)}
+.app .cur{background:#15161C;border-color:#26283A}
+.app .mlist button.on{background:#3D5CF514;box-shadow:inset 3px 0 0 var(--pri)}
+.app .hstat-v{color:var(--ink)}
+.app .btn-add{background:#3D5CF51f;border-color:#3D5CF566;color:var(--pri-t)}
+.app .btn-add:hover{background:#3D5CF52e;border-color:#3D5CF599}
+.app .ls button.on.long{background:var(--up);color:#06150E}
+.app .atabs a.on{background:#3D5CF51f;color:#fff}
+.app .feed-tab.on{box-shadow:inset 0 -2px 0 var(--pri)}
+.app .bpanel-tabs button.on{box-shadow:inset 0 -2px 0 var(--pri)}
+.app .lev-chip{background:#3D5CF52b;color:var(--pri-t)}
+
+/* ================= portfolio balance block ================= */
+.bal{padding:34px 0 0}
+.bal-label{font-size:13px;color:var(--ink3);letter-spacing:.02em}
+.bal-amount{font-size:clamp(40px,5.6vw,66px);line-height:1.05;letter-spacing:-.035em;margin-top:6px}
+.bal-unit{font-size:.42em;color:var(--ink3);letter-spacing:0}
+.bal-sub{display:flex;flex-wrap:wrap;gap:22px;margin-top:14px;font-size:13.5px;color:var(--ink3)}
+.bal-sub b{font-weight:500;color:var(--ink);margin-left:6px}
+.bal-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.bal-wallet{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;font-size:12.5px;color:var(--ink2)}
+
+.act-wrap{position:relative;display:inline-flex}
+.act{height:42px;padding:0 20px;border-radius:999px;border:1px solid var(--ln2);
+  background:var(--s1);color:var(--ink);font-size:14px;font-weight:500}
+.act:hover:not(:disabled){border-color:#3A3A3F;background:var(--s2)}
+.act:disabled{opacity:.45;cursor:not-allowed}
+.act-primary{background:var(--pri);border-color:transparent;color:#fff}
+.act-primary:hover:not(:disabled){background:#4F6BFF;border-color:transparent}
+/* Explain what the button does before it is pressed, not after. */
+.act-hint{position:absolute;top:calc(100% + 8px);left:0;width:260px;z-index:30;
+  padding:10px 12px;border-radius:10px;background:#17171B;border:1px solid var(--ln2);
+  font-size:12px;line-height:1.5;color:var(--ink2);box-shadow:0 14px 34px #0009;
+  opacity:0;visibility:hidden;transform:translateY(-4px);transition:.18s;pointer-events:none}
+.act-wrap:hover .act-hint,.act-wrap:focus-within .act-hint{opacity:1;visibility:visible;transform:none}
+
+/* ================= documentation + open index ================= */
+.doc{display:grid;grid-template-columns:240px minmax(0,1fr);gap:56px;
+  max-width:1180px;margin:0 auto;padding:calc(var(--top-h,70px) + 56px) 24px 80px}
+.doc-nav{position:sticky;top:calc(var(--top-h,70px) + 24px);align-self:start;
+  display:flex;flex-direction:column;gap:2px}
+.doc-nav-title{font-size:11px;letter-spacing:.12em;color:var(--ink3);padding:0 10px 10px}
+.doc-nav a{padding:7px 10px;border-radius:8px;font-size:14px;color:var(--ink2);line-height:1.35}
+.doc-nav a:hover{background:#ffffff08;color:var(--ink)}
+
+.doc-body{min-width:0;font-size:16.5px;line-height:1.75;color:var(--ink2)}
+.doc-title{font-size:clamp(34px,4.4vw,56px);letter-spacing:-.035em;line-height:1.05;
+  color:var(--ink);margin:10px 0 18px}
+.doc-lead{font-size:19px;line-height:1.65;color:var(--ink2);margin:0 0 10px;max-width:68ch}
+.doc-body p{max-width:68ch}
+.doc-h{font-size:clamp(24px,2.6vw,32px);letter-spacing:-.025em;color:var(--ink);
+  margin:52px 0 14px;padding-top:12px;scroll-margin-top:calc(var(--top-h,70px) + 20px)}
+.doc-h3{font-size:18px;font-weight:600;color:var(--ink);margin:30px 0 8px}
+.doc-body b{color:var(--ink);font-weight:600}
+.doc-list{max-width:68ch;padding-left:22px;margin:12px 0}
+.doc-list li{margin-bottom:10px}
+.doc-link{color:var(--pri-t);text-decoration:underline;text-underline-offset:3px}
+.doc-link:hover{color:#9DB0FF}
+.doc-note{max-width:68ch;margin:20px 0;padding:16px 18px;border-radius:14px;
+  background:#141A33;border:1px solid #3D5CF544;color:#C9D2FF;font-size:14.5px;line-height:1.65}
+.doc-cta{display:flex;flex-wrap:wrap;gap:12px;margin:40px 0 0}
+@media (max-width:900px){
+  .doc{grid-template-columns:1fr;gap:28px;padding-top:calc(var(--top-h,70px) + 28px)}
+  .doc-nav{position:static;flex-direction:row;flex-wrap:wrap;gap:6px}
+  .doc-nav-title{display:none}
+  .doc-nav a{border:1px solid var(--ln2);border-radius:999px;font-size:13px;padding:6px 12px}
+  .doc-body{font-size:16px}
+}
+
+.idx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:8px}
+.idx-card{border:1px solid var(--ln);border-radius:18px;background:var(--s1);padding:16px;
+  display:flex;flex-direction:column;gap:9px;font-size:13.5px}
+.idx-head{display:flex;align-items:center;gap:10px}
+.idx-median{display:flex;justify-content:space-between;align-items:baseline;
+  padding:9px 0;border-top:1px solid var(--ln);border-bottom:1px solid var(--ln);
+  color:var(--ink3)}
+.idx-median b{font-size:17px;color:var(--ink)}
+.idx-row{display:flex;justify-content:space-between;color:var(--ink2);font-size:13px}
+.idx-row b{font-weight:500;color:var(--ink)}
+.idx-foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+  padding-top:9px;border-top:1px solid var(--ln);font-size:12.5px;color:var(--ink3)}
+.idx-foot b{color:var(--ink2);font-weight:500}
+.idx-link{margin-top:4px;font-size:13px;color:var(--pri-t)}
+.idx-link:hover{color:#9DB0FF}

@@ -17,7 +17,7 @@ const TABS = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { signedIn, user, balance, signOut, topUp, ready } = useDemo();
+  const { signedIn, user, balance, topUp, ready } = useDemo();
   const toast = useToast();
   const current = path.split("/")[2] ?? "trade";
 
@@ -58,21 +58,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SettingsMenu />
 
         {!ready ? null : signedIn ? (
-          <button
-            className="acct"
-            type="button"
-            title="Sign out"
-            onClick={() => {
-              signOut();
-              toast("Signed out");
-            }}
-          >
+          /* The balance opens the portfolio. Signing out of a trading app by
+             clicking your own balance is a trap. */
+          <Link className="acct" href="/app/portfolio" title="Open portfolio">
             <span className="mono">{fmt(balance)} tUSDC</span>
             <span style={{ color: "var(--ink3)" }} className="hide-sm">
               @{user}.parallel
             </span>
             <span className="av" />
-          </button>
+          </Link>
         ) : (
           <Link href="/signin" className="btn btn-light" style={{ height: 38, padding: "0 16px", fontSize: 14 }}>
             Connect

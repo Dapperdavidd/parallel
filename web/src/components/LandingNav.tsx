@@ -1,35 +1,26 @@
 import Link from "next/link";
 import { Brand } from "./Brand";
 
-export function TopBanner() {
-  return (
-    <div className="topbanner">
-      Devnet beta · sign up and get 10,000 test dollars ·{" "}
-      <span style={{ color: "var(--amb)" }}>mainnet coming soon</span>
-    </div>
-  );
-}
-
 /**
- * Landing nav, laid out to the reference: mark on the left, then the links and
- * the sign-in button grouped together on the right.
+ * Landing nav: mark on the left, links centred, sign-in on the right.
  *
- * "Trade" and "Hedge" stay ON the landing page — they jump to the step of the
- * feature sequence that explains each one. Only sign-in leads out.
+ * "Markets" and "Product" scroll the page. "Trade" goes straight into the app
+ * — no sign-in required to look around; the app shows "Connect" until you
+ * actually need a wallet. "Hedge" is gone from here: the feature sequence
+ * already covers it and two links into the same section was noise.
  */
 export function LandingNav() {
   return (
     <header className="lnav">
       <nav aria-label="Main">
         <Brand />
+        <div className="navpill">
+          <Link href="/#markets">Markets</Link>
+          <Link href="/#features">Product</Link>
+          <Link href="/app/trade">Trade</Link>
+        </div>
         <div className="nav-right">
-          <div className="navpill">
-            <Link href="/#markets">Markets</Link>
-            <Link href="/#features">Product</Link>
-            <Link href="/#feature-trade">Trade</Link>
-            <Link href="/#feature-hedge">Hedge</Link>
-          </div>
-          <Link href="/signin" className="btn btn-light" style={{ height: 44 }}>
+          <Link href="/signin" className="btn btn-light" style={{ height: 42 }}>
             Sign in / Sign up
           </Link>
         </div>

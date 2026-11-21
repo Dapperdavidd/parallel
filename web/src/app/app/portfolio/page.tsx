@@ -1,23 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { fmt, DEMO_WALLET, STARTING_BALANCE } from "@/lib/mock";
+import { useState } from "react";
+import { fmt, DEMO_WALLET, DEVNET_TOPUP, STARTING_BALANCE } from "@/lib/mock";
 import { useDemo } from "@/lib/store";
+import { useToast } from "@/components/Toast";
 import { PositionsTable } from "@/components/trade/PositionsTable";
 
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+function Action({
+  label,
+  hint,
+  primary,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  hint: string;
+  primary?: boolean;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <div className="card">
-      <div style={{ fontSize: 13, color: "var(--ink3)" }}>{label}</div>
-      <div className="mono" style={{ fontSize: 26, marginTop: 6, color }}>
-        {value}
-      </div>
-    </div>
+    <span className="act-wrap">
+      <button
+        type="button"
+        className={`act${primary ? " act-primary" : ""}`}
+        onClick={onClick}
+        disabled={disabled}
+      >
+        {label}
+      </button>
+      <span className="act-hint" role="tooltip">{hint}</span>
+    </span>
   );
 }
 
 export default function PortfolioPage() {
-  const { signedIn, user, balance, positions, openPnl, ready } = useDemo();
+  const { signedIn, user, balance, positions, openPnl, ready, topUp, signOut } = useDemo();
+  const toast = useToast();
+  const [copied, setCopied] = useState(false);
 
   if (!ready) return null;
 
@@ -35,53 +56,75 @@ export default function PortfolioPage() {
     );
   }
 
-  const equity = balance + positions.reduce((a, p) => a + p.size, 0) + openPnl;
+  const margin = positions.reduce((a, p) => a + p.size, 0);
+  const equity = balance + margin + openPnl;
 
   return (
     <div className="page">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-end",
-          flexWrap: "wrap",
-          gap: 12,
-          marginBottom: 20,
-        }}
-      >
-        <h1 style={{ fontSize: 32, letterSpacing: "-.03em" }}>Portfolio</h1>
-        <div style={{ textAlign: "right", fontSize: 13, color: "var(--ink3)" }}>
-          <div>@{user}.parallel</div>
-          <div className="mono">{DEMO_WALLET}</div>
+      {/* Balance leads, in the open — not boxed in with everything else. */}
+      <section className="bal">
+        <div className="bal-label">Total balance</div>
+        <div className="bal-amount mono">
+          {fmt(equity)} <span className="bal-unit">tUSDC</span>
         </div>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
-          gap: 14,
-          marginBottom: 24,
-        }}
-      >
-        <Stat label="Available" value={`${fmt(balance)} tUSDC`} />
-        <Stat
-          label="Open P&L"
-          value={`${openPnl >= 0 ? "+" : ""}${fmt(openPnl)}`}
-          color={openPnl >= 0 ? "var(--up)" : "var(--dn)"}
-        />
-        <Stat label="Equity" value={fmt(equity)} />
-        <Stat label="Open positions" value={String(positions.length)} />
-      </div>
-
-      <div className="card" style={{ padding: 0, overflowX: "auto" }}>
-        <div style={{ padding: "16px 16px 4px", fontSize: 15, fontWeight: 600 }}>
-          Open positions
+        <div className="bal-sub">
+          <span>
+            Available <b className="mono">{fmt(balance)}</b>
+          </span>
+          <span>
+            In positions <b className="mono">{fmt(margin)}</b>
+          </span>
+          <span>
+            Open P&amp;L{" "}
+            <b className="mono" style={{ color: openPnl >= 0 ? "var(--up)" : "var(--dn)" }}>
+              {openPnl >= 0 ? "+" : ""}
+              {fmt(openPnl)}
+            </b>
+          </span>
         </div>
-        <PositionsTable />
-      </div>
 
-      <div className="card" style={{ marginTop: 20 }}>
+        <div className="bal-actions">
+          <Action
+            label="Add money"
+            primary
+            hint={`Adds ${fmt(DEVNET_TOPUP, 0)} test USDC to your wallet. Devnet only — it is not real money.`}
+            onClick={() => {
+              const amount = topUp();
+              toast(`Added ${fmt(amount, 0)} tUSDC from the devnet faucet`);
+            }}
+          />
+          <Action
+            label="Send"
+            hint="Send tUSDC to another Parallel username or a Solana address."
+            disabled
+          />
+          <Action
+            label="Receive"
+            hint="Show your address and username so someone can send you tUSDC."
+            onClick={() => {
+              void navigator.clipboard?.writeText(DEMO_WALLET);
+              setCopied(true);
+              toast("Wallet address copied");
+              setTimeout(() => setCopied(false), 1800);
+            }}
+          />
+        </div>
+
+        <div className="bal-wallet">
+          <span style={{ color: "var(--ink3)" }}>@{user}.parallel</span>
+          <span className="mono">{DEMO_WALLET}</span>
+          {copied && <span style={{ color: "var(--up)" }}>copied</span>}
+        </div>
+      </section>
+
+      <section style={{ marginTop: 28 }}>
+        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>Open positions</h2>
+        <div className="card" style={{ padding: 0, overflowX: "auto" }}>
+          <PositionsTable />
+        </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 20 }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Account</div>
         <div className="row">
           Starting balance<b>{fmt(STARTING_BALANCE)} tUSDC</b>
@@ -96,7 +139,18 @@ export default function PortfolioPage() {
           Balances are devnet test tokens with no cash value. Your wallet is yours — you can
           export it at any time.
         </p>
-      </div>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ height: 38, marginTop: 16, fontSize: 13 }}
+          onClick={() => {
+            signOut();
+            toast("Signed out");
+          }}
+        >
+          Sign out
+        </button>
+      </section>
     </div>
   );
 }

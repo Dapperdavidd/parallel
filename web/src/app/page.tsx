@@ -14,6 +14,9 @@ export default function HomePage() {
       <SiteTop />
       <Hero />
 
+      {/* Everything below slides up OVER the pinned hero as it zooms out, so
+          the handover happens with no empty stretch in between. */}
+      <div className="after-hero">
       <section className="sec" id="markets">
         <div className="wrap center">
           <span
@@ -102,6 +105,7 @@ export default function HomePage() {
       </section>
 
       <Footer />
+      </div>
     </main>
   );
 }
