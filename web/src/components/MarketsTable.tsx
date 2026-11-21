@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { byCode, fmt, premium, type Market } from "@/lib/mock";
+import { fmt, premium, type Market } from "@/lib/mock";
+import { useMarkets } from "@/lib/live";
 
 function CurrencyBadge({ m, small = false }: { m: Market; small?: boolean }) {
   return (
@@ -12,14 +15,21 @@ function CurrencyBadge({ m, small = false }: { m: Market; small?: boolean }) {
   );
 }
 
-export function StatusPill({ m }: { m: Market }) {
-  const live = m.st === "Live";
+export function StatusPill({ m, paused }: { m: Market; paused?: boolean }) {
+  // A paused market is not a tier — it is a market whose sources went away,
+  // and it must not read as "Live" while that is true.
+  if (paused) {
+    return (
+      <span className="status" title="Not enough live sources — no new positions">
+        <span className="dot" style={{ background: "var(--dn)" }} />
+        Paused
+      </span>
+    );
+  }
+  const isLive = m.st === "Live";
   return (
     <span className="status">
-      <span
-        className="dot"
-        style={{ background: live ? "var(--up)" : "var(--amb)" }}
-      />
+      <span className="dot" style={{ background: isLive ? "var(--up)" : "var(--amb)" }} />
       {m.st}
     </span>
   );
@@ -30,6 +40,11 @@ export function StatusPill({ m }: { m: Market }) {
  * `codes` decides which markets show, so the landing can display a slice.
  */
 export function MarketRows({ codes }: { codes: string[] }) {
+  // Live prices where the index has them, sample values where it does not.
+  const live = useMarkets();
+  const byCode = (c: string): Market & { paused?: boolean } =>
+    live.find((m) => m.c === c) ?? live[0]!;
+
   return (
     <>
       <div className="mrow head">
@@ -59,7 +74,7 @@ export function MarketRows({ codes }: { codes: string[] }) {
               {p.toFixed(1)}%
             </span>
             <span className="hide-sm">
-              <StatusPill m={m} />
+              <StatusPill m={m} paused={m.paused} />
             </span>
             <span className="hide-sm" style={{ textAlign: "right", color: "var(--ink2)", fontSize: 14 }}>
               {m.reg}

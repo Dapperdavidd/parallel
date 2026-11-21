@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "@/styles/design.css";
 import { DemoProvider } from "@/lib/store";
 import { ToastProvider } from "@/components/Toast";
+import { LiveProvider } from "@/lib/live";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -40,8 +41,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         {/* One demo store for the whole site, so signing in on /signin is still
             in effect when the user lands in /app. Phase 3 swaps this for Privy. */}
+        {/* LiveProvider lays the real index over the sample data, so every
+            screen shows live prices without having been rebuilt. */}
         <DemoProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <LiveProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </LiveProvider>
         </DemoProvider>
       </body>
     </html>

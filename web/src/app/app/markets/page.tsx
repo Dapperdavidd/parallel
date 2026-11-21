@@ -2,11 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { MARKETS, fmt, premium } from "@/lib/mock";
+import { fmt, premium } from "@/lib/mock";
 import { CurrencyBadge, StatusPill } from "@/components/MarketsTable";
+import { useLive, useMarkets } from "@/lib/live";
 
 export default function MarketsPage() {
   const [q, setQ] = useState("");
+  // Live prices where the index has them; sample values where it does not.
+  const MARKETS = useMarkets();
+  const { isLive, at } = useLive();
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -17,7 +21,7 @@ export default function MarketsPage() {
         m.name.toLowerCase().includes(needle) ||
         m.reg.toLowerCase().includes(needle),
     );
-  }, [q]);
+  }, [q, MARKETS]);
 
   return (
     <div className="page">
@@ -34,8 +38,17 @@ export default function MarketsPage() {
         <div>
           <h1 style={{ fontSize: 32, letterSpacing: "-.03em" }}>Markets</h1>
           <p style={{ margin: "6px 0 0", color: "var(--ink2)", fontSize: 15 }}>
-            {MARKETS.filter((m) => m.st === "Live").length} live ·{" "}
-            {MARKETS.filter((m) => m.st === "Beta").length} beta · all on devnet
+            {MARKETS.filter((m) => m.st === "Live" && !m.paused).length} live ·{" "}
+            {MARKETS.filter((m) => m.st === "Beta" && !m.paused).length} beta
+            {MARKETS.some((m) => m.paused) &&
+              ` · ${MARKETS.filter((m) => m.paused).length} paused`}{" "}
+            · all on devnet
+            {isLive && at && (
+              <span style={{ color: "var(--ink3)" }}>
+                {" "}
+                · index updated {new Date(at).toLocaleTimeString()}
+              </span>
+            )}
           </p>
         </div>
         <input
@@ -80,7 +93,7 @@ export default function MarketsPage() {
                 {p.toFixed(1)}%
               </span>
               <span style={{ display: "flex", justifyContent: "flex-end" }}>
-                <StatusPill m={m} />
+                <StatusPill m={m} paused={m.paused} />
               </span>
             </Link>
           );
