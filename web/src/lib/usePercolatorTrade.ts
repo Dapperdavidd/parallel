@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useWallets, useSignAndSendTransaction } from "@privy-io/react-auth/solana";
+import bs58 from "bs58";
 import {
   ComputeBudgetProgram,
   Connection,
@@ -43,9 +44,14 @@ export function usePercolatorTrade() {
       const wallet = wallets[0];
       if (!wallet) throw new Error("Your Solana wallet is not ready");
       const result = await signAndSendTransaction({ transaction, wallet, chain: "solana:devnet" });
-      return typeof result === "object" && result !== null && "signature" in result
-        ? String((result as { signature: unknown }).signature)
-        : String(result);
+      const signature =
+        typeof result === "object" && result !== null && "signature" in result
+          ? (result as { signature: unknown }).signature
+          : result;
+      if (typeof signature === "string") return signature;
+      if (signature instanceof Uint8Array) return bs58.encode(signature);
+      if (Array.isArray(signature)) return bs58.encode(Uint8Array.from(signature));
+      throw new Error("The wallet returned an unreadable transaction signature");
     },
     [wallets, signAndSendTransaction],
   );
