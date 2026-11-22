@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { compactUsd, fmt } from "@/lib/mock";
-import { localQuote, summarize, type VerifiedTrade } from "@/lib/portfolio";
+import { localQuote } from "@/lib/portfolio";
 import { useDemo } from "@/lib/store";
+import { useChainPortfolio, usdc, type ChainPortfolio } from "@/lib/useChainPortfolio";
 import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
 import { useToast } from "@/components/Toast";
 import { EquityChart } from "@/components/EquityChart";
@@ -23,37 +24,6 @@ import { EquityChart } from "@/components/EquityChart";
  * gone.
  */
 
-interface ChainPosition {
-  side: "long" | "short";
-  sizeQ: string;
-  notionalAtoms: string;
-}
-
-interface ChainPortfolio {
-  address: string;
-  marketId: string;
-  code: string;
-  unit: number;
-  unitLabel: string;
-  maxLeverage: number;
-  capitalAtoms: string;
-  pnlAtoms: string;
-  equityAtoms: string;
-  effectivePriceE6: string;
-  positions: ChainPosition[];
-}
-
-interface PortfolioSnapshot {
-  wallet: string;
-  slot: number;
-  walletAtoms: string;
-  portfolioEquityAtoms: string;
-  storedPnlAtoms: string;
-  totalEquityAtoms: string;
-  portfolios: ChainPortfolio[];
-}
-
-const usdc = (atoms: string): number => Number(BigInt(atoms)) / 1_000_000;
 const short = (address: string): string => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 function Action({
@@ -106,52 +76,23 @@ export default function PortfolioPage() {
 
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<Tab>("Positions");
-  const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
-  const [trades, setTrades] = useState<VerifiedTrade[] | null>(null);
-  const [readError, setReadError] = useState("");
   const [closing, setClosing] = useState("");
 
-  const load = useCallback(async (): Promise<void> => {
-    if (!walletAddress) return;
-    const wallet = encodeURIComponent(walletAddress);
-    const [chain, history] = await Promise.all([
-      fetch(`/api/portfolio?wallet=${wallet}`, { cache: "no-store" }),
-      fetch(`/api/trades?wallet=${wallet}&limit=100`, { cache: "no-store" }),
-    ]);
-    const body = (await chain.json()) as PortfolioSnapshot & { error?: string };
-    if (!chain.ok) throw new Error(body.error ?? "The portfolio read failed");
-    setSnapshot(body);
-    // History is supporting detail: a failure here must not blank the balances.
-    setTrades(history.ok ? ((await history.json()) as { trades: VerifiedTrade[] }).trades : []);
-    setReadError("");
-  }, [walletAddress]);
+  const {
+    snapshot,
+    trades,
+    summary,
+    positions,
+    walletBalance,
+    portfolioEquity,
+    equity,
+    unrealized,
+    error: readError,
+    refresh,
+    reload,
+  } = useChainPortfolio();
 
-  const refresh = useCallback((): void => {
-    void load().catch((error: unknown) => {
-      setReadError(error instanceof Error ? error.message : "The portfolio read failed");
-    });
-  }, [load]);
-
-  useEffect(() => {
-    if (!signedIn || !walletAddress) return;
-    refresh();
-  }, [signedIn, walletAddress, refresh]);
-
-  const walletBalance = snapshot ? usdc(snapshot.walletAtoms) : 0;
-  const portfolioEquity = snapshot ? usdc(snapshot.portfolioEquityAtoms) : 0;
-  const equity = snapshot ? usdc(snapshot.totalEquityAtoms) : 0;
-  const unrealized = snapshot ? usdc(snapshot.storedPnlAtoms) : 0;
-
-  const summary = useMemo(() => summarize(trades ?? []), [trades]);
   const up = summary.realized >= 0;
-
-  const positions = useMemo(
-    () =>
-      (snapshot?.portfolios ?? []).flatMap((portfolio) =>
-        portfolio.positions.map((position) => ({ portfolio, position })),
-      ),
-    [snapshot],
-  );
 
   const onClose = useCallback(
     (portfolio: ChainPortfolio): void => {
@@ -159,12 +100,12 @@ export default function PortfolioPage() {
       void close({ code: portfolio.code, portfolio: portfolio.address })
         .then(async (signature) => {
           toast(`Closed on devnet · ${short(signature)}`);
-          await load();
+          await reload();
         })
         .catch((error: unknown) => toast(error instanceof Error ? error.message : "The close failed"))
         .finally(() => setClosing(""));
     },
-    [close, load, toast],
+    [close, reload, toast],
   );
 
   if (!ready) return null;
@@ -214,7 +155,7 @@ export default function PortfolioPage() {
             onClick={() => {
               void topUp()
                 .then(async (amount) => {
-                  await load();
+                  await reload();
                   toast(
                     amount > 0
                       ? `Added ${fmt(amount, 0)} tUSDC from the devnet faucet`

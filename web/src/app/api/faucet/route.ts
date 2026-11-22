@@ -14,12 +14,13 @@ import {
   getAssociatedTokenAddressSync,
   mintTo,
 } from "@solana/spl-token";
+import { FAUCET_USDC_TARGET_ATOMS } from "@/lib/faucet";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TARGET_SOL = 0.12;
-const TARGET_USDC_ATOMS = 5_000_000_000n;
+const TARGET_USDC_ATOMS = FAUCET_USDC_TARGET_ATOMS;
 
 async function loadAuthority(): Promise<Keypair> {
   const encoded = process.env.PARALLEL_MINT_AUTHORITY_SECRET;

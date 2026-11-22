@@ -138,25 +138,12 @@ export const officialSeries = (m: Market, candles: Candle[]) =>
  * Account, positions
  * ------------------------------------------------------------------ */
 
-export interface Position {
-  id: number;
-  c: string;
-  side: "long" | "short";
-  /** Margin committed, in tUSDC. */
-  size: number;
-  lev: number;
-  entry: number;
-}
-
-export const STARTING_BALANCE = 10_000;
+// The local `Position` type, `positionPnl` and the starting-balance constant
+// lived here. Positions and balances are now read from the chain through
+// `useChainPortfolio`, so there is nothing local left to type or to price.
+// `DEMO_WALLET` survives only as the illustration on the sign-in panel, which
+// the owner deferred.
 export const DEMO_WALLET = "7xKp…9fQ2";
-
-/** Unrealised PnL for a position at the market's current price. */
-export function positionPnl(p: Position): number {
-  const m = byCode(p.c);
-  const move = (m.px / p.entry - 1) * (p.side === "long" ? 1 : -1);
-  return p.size * p.lev * move;
-}
 
 /** Liquidation price estimate shown before confirming (PRD F5). */
 export function liquidationPrice(m: Market, side: "long" | "short", lev: number): number {

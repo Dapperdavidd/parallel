@@ -1,46 +1,69 @@
 "use client";
 
-import { useState } from "react";
-import { byCode, fmt, positionPnl } from "@/lib/mock";
+import { useCallback, useState } from "react";
+import { fmt } from "@/lib/mock";
+import { localQuote } from "@/lib/portfolio";
 import { useDemo } from "@/lib/store";
+import { useChainPortfolio, usdc, type ChainPortfolio } from "@/lib/useChainPortfolio";
 import { useToast } from "@/components/Toast";
 import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
 
+/**
+ * The positions panel on the trade screen.
+ *
+ * Reads the chain, not this browser. Through Phase 2 this kept a local list
+ * and computed P&L against a remembered entry price and a sample mark, which
+ * could disagree with the engine; and §7.7 had to bolt on a "close the
+ * on-chain position anyway" button for the case where the local row vanished
+ * but the leg was still open. Both problems go away by reading the only source
+ * that is authoritative.
+ */
+
 export function PositionsTable() {
-  const { positions, signedIn, market, closePosition } = useDemo();
-  const toast = useToast();
+  const { signedIn } = useDemo();
+  const { positions, snapshot, error, refresh, reload } = useChainPortfolio();
   const { close } = usePercolatorTrade();
-  const [closing, setClosing] = useState<number | null>(null);
+  const toast = useToast();
+  const [closing, setClosing] = useState("");
+
+  const onClose = useCallback(
+    (portfolio: ChainPortfolio): void => {
+      setClosing(portfolio.address);
+      void close({ code: portfolio.code, portfolio: portfolio.address })
+        .then(async (signature) => {
+          toast(`Closed on devnet · ${signature.slice(0, 8)}…`);
+          await reload();
+        })
+        .catch((e: unknown) => toast(e instanceof Error ? e.message : "The close failed"))
+        .finally(() => setClosing(""));
+    },
+    [close, reload, toast],
+  );
+
+  if (!signedIn) {
+    return (
+      <p style={{ padding: "6px 16px 18px", margin: 0, fontSize: 13, color: "var(--ink3)" }}>
+        Sign in to see your positions.
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p style={{ padding: "6px 16px 18px", margin: 0, fontSize: 13, color: "var(--dn)" }}>
+        {error}{" "}
+        <button type="button" className="closebtn" onClick={refresh}>
+          Retry
+        </button>
+      </p>
+    );
+  }
 
   if (positions.length === 0) {
     return (
-      <div style={{ padding: "6px 16px 18px", display: "flex", alignItems: "center", gap: 12 }}>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--ink3)" }}>
-          {signedIn
-            ? "No browser position is saved. You can still close an on-chain position in this market."
-            : "Sign in to see your positions."}
-        </p>
-        {signedIn && (
-          <button
-            type="button"
-            className="closebtn"
-            disabled={closing !== null}
-            onClick={async () => {
-              try {
-                setClosing(-1);
-                const signature = await close({ code: market });
-                toast(`Closed on devnet · ${signature.slice(0, 8)}…`);
-              } catch (error) {
-                toast(error instanceof Error ? error.message : "Close failed");
-              } finally {
-                setClosing(null);
-              }
-            }}
-          >
-            {closing !== null ? "Closing…" : `Close on-chain ${market}`}
-          </button>
-        )}
-      </div>
+      <p style={{ padding: "6px 16px 18px", margin: 0, fontSize: 13, color: "var(--ink3)" }}>
+        {snapshot ? "No open positions on-chain." : "Reading your positions…"}
+      </p>
     );
   }
 
@@ -50,50 +73,36 @@ export function PositionsTable() {
         <tr>
           <th>Market</th>
           <th>Side</th>
-          <th>Size</th>
-          <th>Entry</th>
+          <th>Notional</th>
           <th>Mark</th>
-          <th>P&amp;L</th>
+          <th>Stored P&amp;L</th>
           <th />
         </tr>
       </thead>
       <tbody>
-        {positions.map((p) => {
-          const m = byCode(p.c);
-          const v = positionPnl(p);
-          const up = v >= 0;
+        {positions.map(({ portfolio, position }) => {
+          const quote = localQuote(portfolio.unit, portfolio.effectivePriceE6);
+          const pnl = usdc(portfolio.pnlAtoms);
           return (
-            <tr key={p.id}>
-              <td>USD/{p.c}</td>
-              <td style={{ color: p.side === "long" ? "var(--up)" : "var(--dn)" }}>
-                {p.side === "long" ? "Long" : "Short"} {p.lev}x
+            <tr key={`${portfolio.address}-${position.sizeQ}`}>
+              <td>{portfolio.marketId}</td>
+              <td style={{ color: position.side === "long" ? "var(--up)" : "var(--dn)" }}>
+                {position.side === "long" ? "Long" : "Short"}
               </td>
-              <td>{fmt(p.size * p.lev)}</td>
-              <td>{fmt(p.entry, m.dp)}</td>
-              <td>{fmt(m.px, m.dp)}</td>
-              <td style={{ color: up ? "var(--up)" : "var(--dn)" }}>
-                {up ? "+" : ""}
-                {fmt(v)}
+              <td className="mono">{fmt(usdc(position.notionalAtoms))}</td>
+              <td className="mono">{quote === null ? "—" : fmt(quote, 2)}</td>
+              <td className="mono" style={{ color: pnl >= 0 ? "var(--up)" : "var(--dn)" }}>
+                {pnl >= 0 ? "+" : "−"}
+                {fmt(Math.abs(pnl))}
               </td>
               <td style={{ textAlign: "right" }}>
                 <button
                   type="button"
                   className="closebtn"
-                  disabled={closing === p.id}
-                  onClick={async () => {
-                    try {
-                      setClosing(p.id);
-                      const signature = await close({ code: p.c });
-                      const realised = closePosition(p.id);
-                      toast(`Closed on devnet · ${realised >= 0 ? "+" : ""}${fmt(realised)} tUSDC · ${signature.slice(0, 8)}…`);
-                    } catch (error) {
-                      toast(error instanceof Error ? error.message : "Close failed");
-                    } finally {
-                      setClosing(null);
-                    }
-                  }}
+                  disabled={closing !== ""}
+                  onClick={() => onClose(portfolio)}
                 >
-                  {closing === p.id ? "Closing…" : "Close"}
+                  {closing === portfolio.address ? "Closing…" : "Close"}
                 </button>
               </td>
             </tr>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MARKETS, fmt } from "@/lib/mock";
 import { useMarket } from "@/lib/live";
 import { useDemo } from "@/lib/store";
+import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
 import { useToast } from "@/components/Toast";
 
@@ -49,7 +50,9 @@ export default function HedgePage() {
   const [date, setDate] = useState(defaultDate);
   const [busy, setBusy] = useState(false);
   const [hedges, setHedges] = useState<StoredHedge[]>([]);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  // The wallet balance comes from the shared chain snapshot, so opening a
+  // hedge here updates the app bar and the portfolio with it.
+  const { walletBalance, snapshot, reload } = useChainPortfolio();
 
   const m = useMarket(code);
   const usd = m.px > 0 ? amount / m.px : 0;
@@ -57,17 +60,12 @@ export default function HedgePage() {
 
   const load = useCallback(async (): Promise<void> => {
     if (!walletAddress) return;
-    const wallet = encodeURIComponent(walletAddress);
-    const [mine, chain] = await Promise.all([
-      fetch(`/api/hedge?wallet=${wallet}`, { cache: "no-store" }),
-      fetch(`/api/portfolio?wallet=${wallet}`, { cache: "no-store" }),
-    ]);
+    const mine = await fetch(`/api/hedge?wallet=${encodeURIComponent(walletAddress)}`, {
+      cache: "no-store",
+    });
     if (mine.ok) setHedges(((await mine.json()) as { hedges: StoredHedge[] }).hedges);
-    if (chain.ok) {
-      const body = (await chain.json()) as { walletAtoms: string };
-      setWalletBalance(Number(BigInt(body.walletAtoms)) / 1_000_000);
-    }
-  }, [walletAddress]);
+    await reload();
+  }, [walletAddress, reload]);
 
   useEffect(() => {
     if (!signedIn || !walletAddress) return;

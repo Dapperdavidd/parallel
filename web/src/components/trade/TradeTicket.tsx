@@ -12,14 +12,18 @@ import {
 import { useDemo } from "@/lib/store";
 import { useToast } from "@/components/Toast";
 import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
+import { useChainPortfolio } from "@/lib/useChainPortfolio";
 
 const PRESETS = [100, 500, 1000, 2500];
 
 export function TradeTicket({ market }: { market: Market }) {
-  const { signedIn, balance, openPosition } = useDemo();
+  const { signedIn } = useDemo();
   const toast = useToast();
   const router = useRouter();
   const trading = usePercolatorTrade();
+  // Balance and positions come from the chain, so the ticket checks the real
+  // balance and refreshes the shared snapshot once a trade lands.
+  const { walletBalance, reload } = useChainPortfolio();
 
   const [side, setSide] = useState<"long" | "short">("long");
   const [size, setSize] = useState(500);
@@ -46,15 +50,15 @@ export function TradeTicket({ market }: { market: Market }) {
       toast("Minimum size is 10 tUSDC");
       return;
     }
-    if (size + fee > balance) {
-      toast("Not enough tUSDC");
+    if (size + fee > walletBalance) {
+      toast(`Not enough tUSDC — you have ${fmt(walletBalance)}`);
       return;
     }
     setBusy(true);
     try {
       const signature = await trading.open({ code: market.c, side, marginUsdc: size, leverage: lev });
-      openPosition({ c: market.c, side, size, lev, entry: market.px });
       toast(`${side === "long" ? "Long" : "Short"} USD/${market.c} ${lev}x opened · ${signature.slice(0, 8)}…`);
+      await reload();
     } catch (error) {
       toast(error instanceof Error ? error.message : "Trade failed");
     } finally {

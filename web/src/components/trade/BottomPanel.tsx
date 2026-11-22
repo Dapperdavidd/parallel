@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useWallets } from "@privy-io/react-auth/solana";
-import { agoLabel, fmt, recentTrades, type Market } from "@/lib/mock";
+import { fmt, type Market } from "@/lib/mock";
 import { useDemo } from "@/lib/store";
+import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import { PositionsTable } from "./PositionsTable";
 
 const TABS = ["Positions", "Balances", "Trade history", "Funding"] as const;
@@ -22,7 +23,8 @@ interface StoredTrade {
 
 export function BottomPanel({ market }: { market: Market }) {
   const [tab, setTab] = useState<Tab>("Positions");
-  const { signedIn, balance, positions } = useDemo();
+  const { signedIn } = useDemo();
+  const { positions, walletBalance, portfolioEquity, equity, snapshot } = useChainPortfolio();
   const { wallets } = useWallets();
   const [storedTrades, setStoredTrades] = useState<StoredTrade[]>([]);
   const wallet = wallets[0]?.address;
@@ -61,21 +63,17 @@ export function BottomPanel({ market }: { market: Market }) {
             <thead>
               <tr>
                 <th>Asset</th>
-                <th>Available</th>
-                <th>In positions</th>
+                <th>In wallet</th>
+                <th>In portfolios</th>
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>tUSDC</td>
-                <td>{signedIn ? fmt(balance) : "—"}</td>
-                <td>{signedIn ? fmt(positions.reduce((a, p) => a + p.size, 0)) : "—"}</td>
-                <td>
-                  {signedIn
-                    ? fmt(balance + positions.reduce((a, p) => a + p.size, 0))
-                    : "—"}
-                </td>
+                <td>{signedIn && snapshot ? fmt(walletBalance) : "—"}</td>
+                <td>{signedIn && snapshot ? fmt(portfolioEquity) : "—"}</td>
+                <td>{signedIn && snapshot ? fmt(equity) : "—"}</td>
               </tr>
             </tbody>
           </table>
@@ -121,29 +119,21 @@ export function BottomPanel({ market }: { market: Market }) {
           ))}
 
         {tab === "Funding" && (
-          <table className="postable">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Market</th>
-                <th>Rate</th>
-                <th>Payment</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentTrades(market, 6).map((f, i) => (
-                <tr key={f.id}>
-                  <td>{agoLabel(f.ago * 120)} ago</td>
-                  <td>USD/{market.c}</td>
-                  <td style={{ color: i % 2 ? "var(--dn)" : "var(--up)" }}>
-                    {i % 2 ? "-" : "+"}0.00{(i + 1) * 3}%
-                  </td>
-                  <td>{signedIn && positions.length > 0 ? fmt((i + 1) * 0.11) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="bpanel-empty" style={{ lineHeight: 1.6, maxWidth: 620 }}>
+            <p style={{ margin: "0 0 8px" }}>
+              <b>No funding has accrued.</b> These markets were created with a funding cap of
+              about 0.05% per hour, but the Percolator program deployed on devnet does not
+              generate funding through its AuthMark price path — verified on-chain, with the
+              market&rsquo;s own funding counters reading zero after a full liquidation cycle.
+            </p>
+            <p style={{ margin: 0, color: "var(--ink3)" }}>
+              So there is nothing to list here, and a list of plausible-looking payments would
+              be a fiction. Liquidation does work and has been proven end to end; funding needs
+              a newer program build than the one on devnet today.
+            </p>
+          </div>
         )}
+
       </div>
     </div>
   );

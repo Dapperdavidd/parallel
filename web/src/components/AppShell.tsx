@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Brand } from "./Brand";
 import { useDemo } from "@/lib/store";
+import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import { useToast } from "./Toast";
 import { SettingsMenu, LocaleMenu } from "./SettingsMenu";
 import { fmt } from "@/lib/mock";
@@ -17,7 +18,9 @@ const TABS = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { signedIn, user, balance, topUp, ready } = useDemo();
+  const { signedIn, user, topUp, ready } = useDemo();
+  // The bar shows the wallet's real devnet balance, refreshed after a trade.
+  const { walletBalance, snapshot, reload } = useChainPortfolio();
   const toast = useToast();
   const current = path.split("/")[2] ?? "trade";
 
@@ -43,7 +46,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="btn btn-add"
             onClick={() => {
               void topUp()
-                .then((amount) => toast(amount > 0 ? `Added ${fmt(amount)} tUSDC from the devnet faucet` : "Devnet balance is already funded"))
+                .then(async (amount) => {
+                  await reload();
+                  toast(amount > 0 ? `Added ${fmt(amount)} tUSDC from the devnet faucet` : "Devnet balance is already funded");
+                })
                 .catch((error: unknown) => toast(error instanceof Error ? error.message : "Devnet funding failed"));
             }}
           >
@@ -62,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           /* The balance opens the portfolio. Signing out of a trading app by
              clicking your own balance is a trap. */
           <Link className="acct" href="/app/portfolio" title="Open portfolio">
-            <span className="mono">{fmt(balance)} tUSDC</span>
+            <span className="mono">{snapshot ? `${fmt(walletBalance)} tUSDC` : "—"}</span>
             <span style={{ color: "var(--ink3)" }} className="hide-sm">
               @{user}.parallel
             </span>

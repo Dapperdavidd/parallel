@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { byCode } from "@/lib/mock";
 import { useMarket } from "@/lib/live";
 import { useDemo } from "@/lib/store";
+import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import { PriceChart, TIMEFRAMES, type Timeframe } from "@/components/PriceChart";
 import { MarketSelect } from "./MarketSelect";
 import { MarketStats } from "./MarketStats";
@@ -25,7 +26,8 @@ import { BottomPanel } from "./BottomPanel";
  */
 export function TradeView() {
   const params = useSearchParams();
-  const { market: stateMarket, setMarket, positions } = useDemo();
+  const { market: stateMarket, setMarket } = useDemo();
+  const { trades } = useChainPortfolio();
   const [tf, setTf] = useState<Timeframe>("1H");
 
   const requested = params.get("m");
@@ -87,7 +89,12 @@ export function TradeView() {
             </span>
           </div>
 
-          <PriceChart market={m} timeframe={tf} positions={positions} onSource={onSource} />
+          <PriceChart
+            market={m}
+            timeframe={tf}
+            trades={(trades ?? []).filter((t) => t.marketId === `USD/${m.c}`)}
+            onSource={onSource}
+          />
           <BottomPanel market={m} />
         </section>
 

@@ -1,8 +1,12 @@
 "use client";
 
 /**
- * Privy authentication and opening trades use devnet. The position list and
- * close-position flow remain local until the next trading tranche lands.
+ * Privy authentication, the signed-in identity, the selected market and the
+ * devnet faucet.
+ *
+ * This no longer holds positions or a balance. Both are read from the chain
+ * through `useChainPortfolio`, so there is one source of truth for what the
+ * wallet owns and nothing to drift out of step with it.
  */
 
 import {
@@ -15,39 +19,25 @@ import {
 } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
-import {
-  byCode,
-  positionPnl,
-  TRADING_FEE_BPS,
-  type Position,
-} from "./mock";
-
 interface DemoState {
   signedIn: boolean;
   user: string;
-  balance: number;
-  positions: Position[];
   market: string;
 }
 
 const INITIAL: DemoState = {
   signedIn: false,
   user: "",
-  balance: 0,
-  positions: [],
   market: "NGN",
 };
 
 interface Store extends DemoState {
   ready: boolean;
   walletAddress: string;
-  openPnl: number;
   setMarket: (c: string) => void;
   signIn: (user?: string) => void;
   signOut: () => void;
-  openPosition: (p: Omit<Position, "id">) => void;
-  closePosition: (id: number) => number;
-  /** Request the devnet faucet minimum. */
+  /** Request the devnet faucet minimum. Returns the amount added. */
   topUp: () => Promise<number>;
 }
 
@@ -101,7 +91,6 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     if (!response.ok || body.balance === undefined) {
       throw new Error(body.error ?? "Devnet funding failed");
     }
-    setS((p) => ({ ...p, balance: body.balance ?? p.balance }));
     return body.added ?? 0;
   }, [walletAddress]);
 
@@ -110,39 +99,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     void fundWallet().catch(() => undefined);
   }, [authReady, authenticated, walletAddress, fundWallet]);
 
-  const openPosition = useCallback((p: Omit<Position, "id">) => {
-    setS((prev) => {
-      const fee = p.size * p.lev * (TRADING_FEE_BPS / 10_000);
-      return {
-        ...prev,
-        balance: prev.balance - p.size - fee,
-        positions: [{ ...p, id: Date.now() }, ...prev.positions],
-      };
-    });
-  }, []);
-
-  const closePosition = useCallback((id: number): number => {
-    let realised = 0;
-    setS((prev) => {
-      const pos = prev.positions.find((x) => x.id === id);
-      if (!pos) return prev;
-      realised = positionPnl(pos);
-      return {
-        ...prev,
-        balance: prev.balance + pos.size + realised,
-        positions: prev.positions.filter((x) => x.id !== id),
-      };
-    });
-    return realised;
-  }, []);
-
   /** Add money through the idempotent devnet faucet. */
   const topUp = useCallback(async (): Promise<number> => fundWallet(), [fundWallet]);
-
-  const openPnl = useMemo(
-    () => s.positions.reduce((a, p) => a + positionPnl(p), 0),
-    [s.positions],
-  );
 
   const ready = hydrated && authReady;
   const displayUser =
@@ -155,15 +113,12 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       signedIn: authenticated,
       walletAddress,
       user: displayUser,
-      openPnl,
       setMarket,
       signIn,
       signOut,
-      openPosition,
-      closePosition,
       topUp,
     }),
-    [s, ready, authenticated, walletAddress, displayUser, openPnl, setMarket, signIn, signOut, openPosition, closePosition, topUp],
+    [s, ready, authenticated, walletAddress, displayUser, setMarket, signIn, signOut, topUp],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -174,5 +129,3 @@ export function useDemo(): Store {
   if (!v) throw new Error("useDemo must be used inside <DemoProvider>");
   return v;
 }
-
-export { byCode };

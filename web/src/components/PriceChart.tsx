@@ -11,7 +11,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { candlesFor, type Candle, type Market, type Position } from "@/lib/mock";
+import { candlesFor, type Candle, type Market } from "@/lib/mock";
 
 /** What /api/candles returns. */
 interface ChartFeed {
@@ -53,12 +53,13 @@ const STEP_SECONDS: Record<Timeframe, number> = {
 export function PriceChart({
   market,
   timeframe,
-  positions,
+  trades,
   onSource,
 }: {
   market: Market;
   timeframe: Timeframe;
-  positions: Position[];
+  /** The viewer's confirmed trades in this market. */
+  trades: { ts: string; side: "long" | "short"; action: string }[];
   /** Tells the caller what the chart is actually showing, so it can say so. */
   onSource?: (s: { mode: "index" | "official" | "sample"; indexFrom: string | null }) => void;
 }) {
@@ -225,20 +226,37 @@ export function PriceChart({
       title: "mark",
     });
 
-    // The viewer's own entries, newest first so overlapping labels stay legible.
-    const mine = positions.filter((p) => p.c === market.c);
+    // The viewer's own confirmed trades, each snapped to the candle it landed
+    // in. Previously these arrows were placed at arbitrary bar offsets from the
+    // right edge, which put a real position at a time it never happened; a
+    // marker is only worth drawing where it actually belongs.
+    const first = data[0]!.time as number;
+    const last = data[data.length - 1]!.time as number;
     candles.setMarkers(
-      mine.map((p, i) => ({
-        time: data[Math.max(0, data.length - 2 - i * 4)]!.time as UTCTimestamp,
-        position: p.side === "long" ? ("belowBar" as const) : ("aboveBar" as const),
-        color: p.side === "long" ? "#2EBD85" : "#E5484D",
-        shape: p.side === "long" ? ("arrowUp" as const) : ("arrowDown" as const),
-        text: `${p.side === "long" ? "Long" : "Short"} ${p.lev}x`,
-      })),
+      trades
+        .map((t) => ({ t, at: Math.floor(new Date(t.ts).getTime() / 1000) }))
+        .filter(({ at }) => at >= first && at <= last)
+        .sort((a, b) => a.at - b.at)
+        .map(({ t, at }) => {
+          // Snap back to the opening time of the bar that contains it.
+          const bar = data.reduce(
+            (best, point) => ((point.time as number) <= at ? (point.time as number) : best),
+            first,
+          );
+          const long = t.side === "long";
+          const closing = t.action === "close";
+          return {
+            time: bar as UTCTimestamp,
+            position: long ? ("belowBar" as const) : ("aboveBar" as const),
+            color: closing ? "#868CA2" : long ? "#2EBD85" : "#E5484D",
+            shape: long ? ("arrowUp" as const) : ("arrowDown" as const),
+            text: `${closing ? "Closed" : long ? "Long" : "Short"}`,
+          };
+        }),
     );
 
     chart.timeScale().fitContent();
-  }, [market, timeframe, positions, feed, onSource]);
+  }, [market, timeframe, trades, feed, onSource]);
 
   return (
     <div

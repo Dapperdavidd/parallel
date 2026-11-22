@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { Brand } from "@/components/Brand";
 import { useDemo } from "@/lib/store";
 import { useToast } from "@/components/Toast";
-import { DEMO_WALLET, fmt, STARTING_BALANCE } from "@/lib/mock";
+import { DEMO_WALLET, fmt } from "@/lib/mock";
+import { FAUCET_USDC_TARGET } from "@/lib/faucet";
 
 /**
  * One flow for sign-in and sign-up, as the design hand-off specifies: the user
@@ -78,7 +79,7 @@ export default function SignInPage() {
     signIn(name);
     toast(
       isNew
-        ? `Wallet funded with ${fmt(STARTING_BALANCE)} tUSDC. You're on the naira market.`
+        ? `Wallet funded with ${fmt(FAUCET_USDC_TARGET)} tUSDC. You're on the naira market.`
         : `Welcome back, @${name}`,
     );
     router.push("/app/trade");
@@ -251,7 +252,7 @@ export default function SignInPage() {
                 <p>No wallet was linked to this login, so we made one. You paid nothing.</p>
               </div>
               <Check delay={250}>Solana wallet created — no seed phrase to keep</Check>
-              <Check delay={600}>Funded with {fmt(STARTING_BALANCE)} test dollars</Check>
+              <Check delay={600}>Funded with {fmt(FAUCET_USDC_TARGET)} test dollars</Check>
               <Check delay={950}>Network fees covered by Parallel</Check>
               <button
                 className="btn btn-pri"
@@ -333,7 +334,7 @@ export default function SignInPage() {
                 </span>
                 <span style={{ textAlign: "right" }}>
                   <span style={{ display: "block", fontSize: 13, color: "var(--ink3)" }}>Balance</span>
-                  <span className="mono">{fmt(STARTING_BALANCE)} tUSDC</span>
+                  <span className="mono">{fmt(FAUCET_USDC_TARGET)} tUSDC</span>
                 </span>
               </div>
             </>
