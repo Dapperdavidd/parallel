@@ -151,7 +151,20 @@ function usePercolatorTradeValue() {
       });
       const body = (await prepared.json()) as { transaction?: string; error?: string };
       if (!prepared.ok || !body.transaction) throw new Error(body.error ?? "Trade preparation failed");
-      return send(bytesFromBase64(body.transaction));
+      const signature = await send(bytesFromBase64(body.transaction));
+      await fetch("/api/trades", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          signature,
+          wallet: wallet.address,
+          portfolio,
+          marketId: market.id,
+          action: "open",
+          leverage: input.leverage,
+        }),
+      }).catch(() => undefined);
+      return signature;
     },
     [wallets, ensurePortfolio, send],
   );
@@ -174,7 +187,20 @@ function usePercolatorTradeValue() {
       });
       const body = (await prepared.json()) as { transaction?: string; error?: string };
       if (!prepared.ok || !body.transaction) throw new Error(body.error ?? "Close preparation failed");
-      return send(bytesFromBase64(body.transaction));
+      const signature = await send(bytesFromBase64(body.transaction));
+      await fetch("/api/trades", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          signature,
+          wallet: wallet.address,
+          portfolio,
+          marketId: market.id,
+          action: "close",
+          leverage: 1,
+        }),
+      }).catch(() => undefined);
+      return signature;
     },
     [wallets, send],
   );

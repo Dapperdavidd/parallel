@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -313,6 +313,43 @@ export async function recentTrades(marketId: string | null, limit = 40): Promise
   const all = await readLines<Trade>(join(DATA_DIR, "trades.jsonl"));
   const filtered = marketId ? all.filter((t) => t.marketId === marketId) : all;
   return filtered.slice(Math.max(0, filtered.length - limit)).reverse();
+}
+
+/** Persist a chain-verified trade, idempotently by transaction signature. */
+let tradeWrite = Promise.resolve();
+
+async function recordTradeUnlocked(trade: Trade): Promise<void> {
+  const client = db();
+  if (client) {
+    const { error } = await client.from("trades").upsert(
+      {
+        market_id: trade.marketId,
+        wallet: trade.wallet,
+        side: trade.side,
+        action: trade.action,
+        size_usdc: trade.sizeUsdc,
+        leverage: trade.leverage,
+        price: trade.price,
+        tx_signature: trade.txSignature,
+        ts: trade.ts,
+      },
+      { onConflict: "tx_signature", ignoreDuplicates: true },
+    );
+    if (error) throw error;
+    return;
+  }
+
+  const path = join(DATA_DIR, "trades.jsonl");
+  const existing = await readLines<Trade>(path);
+  if (existing.some((row) => row.txSignature === trade.txSignature)) return;
+  await mkdir(DATA_DIR, { recursive: true });
+  await appendFile(path, `${JSON.stringify(trade)}\n`, "utf8");
+}
+
+export function recordTrade(trade: Trade): Promise<void> {
+  const write = () => recordTradeUnlocked(trade);
+  tradeWrite = tradeWrite.then(write, write);
+  return tradeWrite;
 }
 
 // -------------------------------------------------------- official history --
