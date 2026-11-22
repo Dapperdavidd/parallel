@@ -59,6 +59,7 @@ export function Footer() {
             <h4>Parallel</h4>
             <Link href="/docs/about">About</Link>
             <Link href="/open-index">Open index</Link>
+            <Link href="/vaults">Liquidity vaults</Link>
             <Link href="/docs/risks">Risk disclosure</Link>
             <Link href="/signin">Sign in / Sign up</Link>
           </div>
