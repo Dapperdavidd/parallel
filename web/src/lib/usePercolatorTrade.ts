@@ -170,14 +170,19 @@ function usePercolatorTradeValue() {
   );
 
   const close = useCallback(
-    async (input: { code: string }) => {
+    async (input: { code: string; portfolio?: string }) => {
       const wallet = wallets[0];
       if (!wallet) throw new Error("Your Solana wallet is not ready");
       const marketResponse = await fetch("/api/markets", { cache: "no-store" });
       const marketBody = (await marketResponse.json()) as { markets: MarketConfig[] };
       const market = marketBody.markets.find((entry) => entry.code === input.code);
       if (!market) throw new Error("Market configuration is unavailable");
-      const portfolio = localStorage.getItem(`parallel.portfolio.${market.id}.${wallet.address}`);
+      // The portfolio page reads the real address off the chain, so it can pass
+      // it in; a browser that opened the position has it in local storage. The
+      // guarded route re-derives the close size either way, so neither source
+      // is trusted for anything but *which* portfolio to read.
+      const portfolio =
+        input.portfolio ?? localStorage.getItem(`parallel.portfolio.${market.id}.${wallet.address}`);
       if (!portfolio) throw new Error("No on-chain portfolio was found for this market");
 
       const prepared = await fetch("/api/trade/close/prepare", {

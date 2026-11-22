@@ -1,24 +1,60 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import {
-  ACCOUNT_FEES,
-  ACCOUNT_TRADES,
-  ACCOUNT_VOLUME,
-  DEMO_WALLET,
-  EQUITY_RANGES,
-  STARTING_BALANCE,
-  accountStats,
-  compactUsd,
-  equitySeries,
-  fmt,
-  type EquityRange,
-} from "@/lib/mock";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { compactUsd, fmt } from "@/lib/mock";
+import { localQuote, summarize, type VerifiedTrade } from "@/lib/portfolio";
 import { useDemo } from "@/lib/store";
+import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
 import { useToast } from "@/components/Toast";
 import { EquityChart } from "@/components/EquityChart";
-import { PositionsTable } from "@/components/trade/PositionsTable";
+
+/**
+ * F12 — the portfolio, from the chain and from verified trade records.
+ *
+ * Two sources, both confirmed:
+ *   - `/api/portfolio` reads the wallet's token balance and every Percolator
+ *     portfolio it owns at one slot, including open legs and stored PnL;
+ *   - `/api/trades` returns only trades the server matched against a confirmed
+ *     devnet transaction, which is what the realised curve is built from.
+ *
+ * Where neither source has a figure, the screen shows a dash. The seeded
+ * equity curve and the placeholder wallet that stood here through Phase 2 are
+ * gone.
+ */
+
+interface ChainPosition {
+  side: "long" | "short";
+  sizeQ: string;
+  notionalAtoms: string;
+}
+
+interface ChainPortfolio {
+  address: string;
+  marketId: string;
+  code: string;
+  unit: number;
+  unitLabel: string;
+  maxLeverage: number;
+  capitalAtoms: string;
+  pnlAtoms: string;
+  equityAtoms: string;
+  effectivePriceE6: string;
+  positions: ChainPosition[];
+}
+
+interface PortfolioSnapshot {
+  wallet: string;
+  slot: number;
+  walletAtoms: string;
+  portfolioEquityAtoms: string;
+  storedPnlAtoms: string;
+  totalEquityAtoms: string;
+  portfolios: ChainPortfolio[];
+}
+
+const usdc = (atoms: string): number => Number(BigInt(atoms)) / 1_000_000;
+const short = (address: string): string => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 function Action({
   label,
@@ -64,20 +100,72 @@ const TABS = ["Positions", "Balances", "Account"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
-  const { signedIn, user, balance, positions, openPnl, ready, topUp, signOut } = useDemo();
+  const { signedIn, user, walletAddress, ready, topUp, signOut } = useDemo();
+  const { close } = usePercolatorTrade();
   const toast = useToast();
+
   const [copied, setCopied] = useState(false);
-  const [range, setRange] = useState<EquityRange>("1W");
   const [tab, setTab] = useState<Tab>("Positions");
+  const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
+  const [trades, setTrades] = useState<VerifiedTrade[] | null>(null);
+  const [readError, setReadError] = useState("");
+  const [closing, setClosing] = useState("");
 
-  const margin = positions.reduce((a, p) => a + p.size, 0);
-  const equity = balance + margin + openPnl;
+  const load = useCallback(async (): Promise<void> => {
+    if (!walletAddress) return;
+    const wallet = encodeURIComponent(walletAddress);
+    const [chain, history] = await Promise.all([
+      fetch(`/api/portfolio?wallet=${wallet}`, { cache: "no-store" }),
+      fetch(`/api/trades?wallet=${wallet}&limit=100`, { cache: "no-store" }),
+    ]);
+    const body = (await chain.json()) as PortfolioSnapshot & { error?: string };
+    if (!chain.ok) throw new Error(body.error ?? "The portfolio read failed");
+    setSnapshot(body);
+    // History is supporting detail: a failure here must not blank the balances.
+    setTrades(history.ok ? ((await history.json()) as { trades: VerifiedTrade[] }).trades : []);
+    setReadError("");
+  }, [walletAddress]);
 
-  // The chart and every figure under it come from one series, so they cannot
-  // drift apart.
-  const series = useMemo(() => equitySeries(equity, range), [equity, range]);
-  const stats = useMemo(() => accountStats(series), [series]);
-  const up = stats.pnl >= 0;
+  const refresh = useCallback((): void => {
+    void load().catch((error: unknown) => {
+      setReadError(error instanceof Error ? error.message : "The portfolio read failed");
+    });
+  }, [load]);
+
+  useEffect(() => {
+    if (!signedIn || !walletAddress) return;
+    refresh();
+  }, [signedIn, walletAddress, refresh]);
+
+  const walletBalance = snapshot ? usdc(snapshot.walletAtoms) : 0;
+  const portfolioEquity = snapshot ? usdc(snapshot.portfolioEquityAtoms) : 0;
+  const equity = snapshot ? usdc(snapshot.totalEquityAtoms) : 0;
+  const unrealized = snapshot ? usdc(snapshot.storedPnlAtoms) : 0;
+
+  const summary = useMemo(() => summarize(trades ?? []), [trades]);
+  const up = summary.realized >= 0;
+
+  const positions = useMemo(
+    () =>
+      (snapshot?.portfolios ?? []).flatMap((portfolio) =>
+        portfolio.positions.map((position) => ({ portfolio, position })),
+      ),
+    [snapshot],
+  );
+
+  const onClose = useCallback(
+    (portfolio: ChainPortfolio): void => {
+      setClosing(portfolio.address);
+      void close({ code: portfolio.code, portfolio: portfolio.address })
+        .then(async (signature) => {
+          toast(`Closed on devnet · ${short(signature)}`);
+          await load();
+        })
+        .catch((error: unknown) => toast(error instanceof Error ? error.message : "The close failed"))
+        .finally(() => setClosing(""));
+    },
+    [close, load, toast],
+  );
 
   if (!ready) return null;
 
@@ -101,20 +189,19 @@ export default function PortfolioPage() {
       <section className="bal">
         <div className="bal-label">Total balance</div>
         <div className="bal-amount mono">
-          {fmt(equity)} <span className="bal-unit">tUSDC</span>
+          {snapshot ? fmt(equity) : "—"} <span className="bal-unit">tUSDC</span>
         </div>
         <div className="bal-sub">
           <span>
-            Available <b className="mono">{fmt(balance)}</b>
+            In wallet <b className="mono">{snapshot ? fmt(walletBalance) : "—"}</b>
           </span>
           <span>
-            In positions <b className="mono">{fmt(margin)}</b>
+            In portfolios <b className="mono">{snapshot ? fmt(portfolioEquity) : "—"}</b>
           </span>
           <span>
-            Open P&amp;L{" "}
-            <b className="mono" style={{ color: openPnl >= 0 ? "var(--up)" : "var(--dn)" }}>
-              {openPnl >= 0 ? "+" : ""}
-              {fmt(openPnl)}
+            Unrealised P&amp;L{" "}
+            <b className="mono" style={{ color: unrealized >= 0 ? "var(--up)" : "var(--dn)" }}>
+              {snapshot ? `${unrealized >= 0 ? "+" : "−"}${fmt(Math.abs(unrealized))}` : "—"}
             </b>
           </span>
         </div>
@@ -123,11 +210,20 @@ export default function PortfolioPage() {
           <Action
             label="Add money"
             primary
-            hint={`Restores your wallet to ${fmt(STARTING_BALANCE, 0)} test USDC. Devnet only — it is not real money.`}
+            hint="Tops your devnet wallet up from the faucet. Devnet only — it is not real money."
             onClick={() => {
               void topUp()
-                .then((amount) => toast(amount > 0 ? `Added ${fmt(amount, 0)} tUSDC from the devnet faucet` : "Devnet balance is already funded"))
-                .catch((error: unknown) => toast(error instanceof Error ? error.message : "Devnet funding failed"));
+                .then(async (amount) => {
+                  await load();
+                  toast(
+                    amount > 0
+                      ? `Added ${fmt(amount, 0)} tUSDC from the devnet faucet`
+                      : "Devnet balance is already funded",
+                  );
+                })
+                .catch((error: unknown) =>
+                  toast(error instanceof Error ? error.message : "Devnet funding failed"),
+                );
             }}
           />
           <Action
@@ -137,9 +233,9 @@ export default function PortfolioPage() {
           />
           <Action
             label="Receive"
-            hint="Show your address and username so someone can send you tUSDC."
+            hint="Copy your wallet address so someone can send you tUSDC."
             onClick={() => {
-              void navigator.clipboard?.writeText(DEMO_WALLET);
+              void navigator.clipboard?.writeText(walletAddress);
               setCopied(true);
               toast("Wallet address copied");
               setTimeout(() => setCopied(false), 1800);
@@ -149,59 +245,80 @@ export default function PortfolioPage() {
 
         <div className="bal-wallet">
           <span style={{ color: "var(--ink3)" }}>@{user}.parallel</span>
-          <span className="mono">{DEMO_WALLET}</span>
+          <span className="mono">{walletAddress ? short(walletAddress) : "—"}</span>
           {copied && <span style={{ color: "var(--up)" }}>copied</span>}
         </div>
       </section>
 
-      {/* Performance: the curve, then the figures it produces. */}
+      {readError && (
+        <p style={{ color: "var(--dn)", margin: "0 0 10px" }}>
+          {readError}{" "}
+          <button type="button" className="btn btn-ghost" style={{ height: 28, fontSize: 12 }} onClick={refresh}>
+            Retry
+          </button>
+        </p>
+      )}
+
+      {/* Realised P&L only. Each step is a settled close, so the curve is flat
+          between them rather than drifting through invented values. */}
       <section className="perf">
         <div className="perf-top">
           <div>
-            <div className="ptile-label">Performance</div>
+            <div className="ptile-label">Realised performance</div>
             <div className="perf-pnl mono" style={{ color: up ? "var(--up)" : "var(--dn)" }}>
-              {up ? "+" : "−"}
-              {fmt(Math.abs(stats.pnl))}
+              {trades ? `${up ? "+" : "−"}${fmt(Math.abs(summary.realized))}` : "—"}
               <span className="perf-pct">
-                {up ? "+" : "−"}
-                {Math.abs(stats.pnlPct).toFixed(2)}%
+                {summary.closes} {summary.closes === 1 ? "close" : "closes"}
               </span>
             </div>
           </div>
-
-          <div className="perf-ranges" role="tablist" aria-label="Chart range">
-            {EQUITY_RANGES.map((r) => (
-              <button
-                key={r}
-                type="button"
-                role="tab"
-                aria-selected={r === range}
-                className={r === range ? "on" : undefined}
-                onClick={() => setRange(r)}
-              >
-                {r}
-              </button>
-            ))}
+          <div className="ptile-label mono">
+            {snapshot ? `slot ${snapshot.slot.toLocaleString()}` : "reading…"}
           </div>
         </div>
 
-        <EquityChart data={series} up={up} />
+        {summary.curve.length >= 2 ? (
+          <EquityChart data={summary.curve} up={up} />
+        ) : (
+          <div
+            className="eq-host"
+            style={{
+              display: "grid",
+              placeItems: "center",
+              color: "var(--ink3)",
+              fontSize: 13,
+              textAlign: "center",
+              padding: "0 20px",
+            }}
+          >
+            Your curve starts at your first settled close. Nothing is drawn before then.
+          </div>
+        )}
 
         <div className="ptiles">
           <Tile
-            label="P&L"
-            value={`${up ? "+" : "−"}${fmt(Math.abs(stats.pnl))}`}
-            sub={`${range} · tUSDC`}
+            label="Realised P&L"
+            value={trades ? `${up ? "+" : "−"}${fmt(Math.abs(summary.realized))}` : "—"}
+            sub="From verified closes"
             tone={up ? "var(--up)" : "var(--dn)"}
           />
           <Tile
-            label="Max drawdown"
-            value={`−${fmt(stats.maxDrawdown)}`}
-            sub={`${stats.maxDrawdownPct.toFixed(2)}% from peak`}
+            label="Unrealised P&L"
+            value={snapshot ? `${unrealized >= 0 ? "+" : "−"}${fmt(Math.abs(unrealized))}` : "—"}
+            sub="Stored on-chain"
+            tone={unrealized >= 0 ? "var(--up)" : "var(--dn)"}
           />
-          <Tile label="Total equity" value={fmt(stats.equity)} sub="tUSDC" />
-          <Tile label="Volume traded" value={compactUsd(ACCOUNT_VOLUME)} sub={`${ACCOUNT_TRADES} trades`} />
-          <Tile label="Fees paid" value={fmt(ACCOUNT_FEES)} sub="0.06% per trade" />
+          <Tile label="Total equity" value={snapshot ? fmt(equity) : "—"} sub="Wallet + portfolios" />
+          <Tile
+            label="Volume traded"
+            value={trades ? compactUsd(summary.volume) : "—"}
+            sub={`${summary.trades} verified ${summary.trades === 1 ? "trade" : "trades"}`}
+          />
+          <Tile
+            label="Fees paid"
+            value={fmt(0)}
+            sub="No trading fee on devnet"
+          />
         </div>
       </section>
 
@@ -223,24 +340,71 @@ export default function PortfolioPage() {
         </div>
 
         <div className="pcard-body">
-          {tab === "Positions" && <PositionsTable />}
+          {tab === "Positions" &&
+            (positions.length === 0 ? (
+              <p style={{ padding: "6px 16px 18px", color: "var(--ink3)" }}>
+                {snapshot ? "No open positions on-chain." : "Reading your portfolios…"}
+              </p>
+            ) : (
+              <table className="postable">
+                <thead>
+                  <tr>
+                    <th>Market</th>
+                    <th>Side</th>
+                    <th>Notional</th>
+                    <th>Mark</th>
+                    <th>Portfolio</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {positions.map(({ portfolio, position }) => {
+                    const quote = localQuote(portfolio.unit, portfolio.effectivePriceE6);
+                    return (
+                      <tr key={`${portfolio.address}-${position.sizeQ}`}>
+                        <td>{portfolio.marketId}</td>
+                        <td style={{ color: position.side === "long" ? "var(--up)" : "var(--dn)" }}>
+                          {position.side === "long" ? "Long" : "Short"}
+                        </td>
+                        <td className="mono">{fmt(usdc(position.notionalAtoms))} tUSDC</td>
+                        <td className="mono">
+                          {quote === null ? "—" : `${quote.toFixed(2)} ${portfolio.code}`}
+                        </td>
+                        <td className="mono">{short(portfolio.address)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ height: 30, fontSize: 12 }}
+                            disabled={closing !== ""}
+                            onClick={() => onClose(portfolio)}
+                          >
+                            {closing === portfolio.address ? "Closing…" : "Close"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ))}
 
           {tab === "Balances" && (
             <table className="postable">
               <thead>
                 <tr>
                   <th>Asset</th>
-                  <th>Available</th>
-                  <th>In positions</th>
+                  <th>In wallet</th>
+                  <th>In portfolios</th>
                   <th>Total</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>tUSDC</td>
-                  <td className="mono">{fmt(balance)}</td>
-                  <td className="mono">{fmt(margin)}</td>
-                  <td className="mono">{fmt(balance + margin)}</td>
+                  <td className="mono">{snapshot ? fmt(walletBalance) : "—"}</td>
+                  <td className="mono">{snapshot ? fmt(portfolioEquity) : "—"}</td>
+                  <td className="mono">{snapshot ? fmt(equity) : "—"}</td>
                 </tr>
               </tbody>
             </table>
@@ -249,17 +413,21 @@ export default function PortfolioPage() {
           {tab === "Account" && (
             <div className="pacct">
               <div className="row">
-                Starting balance<b>{fmt(STARTING_BALANCE)} tUSDC</b>
-              </div>
-              <div className="row">
                 Network<b>Solana devnet</b>
               </div>
               <div className="row">
-                Wallet<b>Created at sign-in, no seed phrase</b>
+                Wallet<b className="mono">{walletAddress || "—"}</b>
+              </div>
+              <div className="row">
+                On-chain portfolios<b>{snapshot?.portfolios.length ?? "—"}</b>
+              </div>
+              <div className="row">
+                Read at slot<b className="mono">{snapshot ? snapshot.slot.toLocaleString() : "—"}</b>
               </div>
               <p>
-                Balances are devnet test tokens with no cash value. Your wallet is yours — you
-                can export it at any time.
+                Balances are devnet test tokens with no cash value. Every figure on this page is a
+                confirmed account read or a verified transaction — nothing here is simulated. Your
+                wallet is yours, and you can export it at any time.
               </p>
               <button
                 type="button"

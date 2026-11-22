@@ -9,16 +9,16 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { EquityPoint } from "@/lib/mock";
+import type { CurvePoint } from "@/lib/portfolio";
 
 /**
- * The account equity curve on the portfolio page.
+ * The realised P&L curve on the portfolio page.
  *
  * Deliberately plainer than the market chart: no grid, no price line, one
  * filled area. The figures beneath it are read off the same series, so the
  * chart and the numbers can never disagree.
  */
-export function EquityChart({ data, up }: { data: EquityPoint[]; up: boolean }) {
+export function EquityChart({ data, up }: { data: CurvePoint[]; up: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const areaRef = useRef<ISeriesApi<"Area"> | null>(null);
@@ -81,5 +81,5 @@ export function EquityChart({ data, up }: { data: EquityPoint[]; up: boolean }) 
     chart.timeScale().fitContent();
   }, [data, up]);
 
-  return <div ref={hostRef} className="eq-host" role="img" aria-label="Account equity over time" />;
+  return <div ref={hostRef} className="eq-host" role="img" aria-label="Realised profit and loss over time" />;
 }

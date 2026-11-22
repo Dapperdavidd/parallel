@@ -40,6 +40,7 @@ const INITIAL: DemoState = {
 
 interface Store extends DemoState {
   ready: boolean;
+  walletAddress: string;
   openPnl: number;
   setMarket: (c: string) => void;
   signIn: (user?: string) => void;
@@ -152,6 +153,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       ...s,
       ready,
       signedIn: authenticated,
+      walletAddress,
       user: displayUser,
       openPnl,
       setMarket,
@@ -161,7 +163,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       closePosition,
       topUp,
     }),
-    [s, ready, authenticated, displayUser, openPnl, setMarket, signIn, signOut, openPosition, closePosition, topUp],
+    [s, ready, authenticated, walletAddress, displayUser, openPnl, setMarket, signIn, signOut, openPosition, closePosition, topUp],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
