@@ -14,6 +14,7 @@ import {
   sizeQForNotional,
   tradeNoCpi,
 } from "@/lib/server/percolator";
+import { engineSign } from "@/lib/side";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,10 +100,15 @@ export async function POST(request: Request) {
     const risk = marketRiskState(marketAccount.data);
     const notionalInAtoms = BigInt(Math.round(requestedNotional * 1e6));
     const absoluteSizeQ = sizeQForNotional(notionalInAtoms, risk.effectivePriceE6);
-    const sizeQ = body.side === "long" ? absoluteSizeQ : -absoluteSizeQ;
+    // A user-facing long is an engine short — see `lib/side.ts`. Getting this
+    // backwards would open the position that loses when the local currency
+    // falls, which is the opposite of what every screen promises.
+    const sizeQ = absoluteSizeQ * engineSign(body.side);
     const resultingSideOi =
       notionalAtoms(
-        body.side === "long" ? risk.openInterestLongQ + absoluteSizeQ : risk.openInterestShortQ + absoluteSizeQ,
+        sizeQ < 0n
+          ? risk.openInterestShortQ + absoluteSizeQ
+          : risk.openInterestLongQ + absoluteSizeQ,
         risk.effectivePriceE6,
       ) / 1_000_000n;
     if (resultingSideOi > BigInt(market.liquidityVault.maxOpenInterestUsdc)) {

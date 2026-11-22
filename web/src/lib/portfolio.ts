@@ -38,15 +38,16 @@ export interface RealizedSummary {
   closes: number;
 }
 
+import { pnlSign } from "./side";
+
 const seconds = (iso: string): number => Math.floor(new Date(iso).getTime() / 1000);
 
 /**
  * Engine arithmetic, not an interpretation of the market name: a leg's P&L is
- * `sizeQ × (exit − entry)`, and `sizeQ` carries the sign. In notional terms
- * that is `notional × (exit / entry − 1)` for a long and the negative of it
- * for a short, which is what this computes. So "long" here means whatever the
- * engine meant by a positive `basisPosQ`, and the figure is right regardless
- * of how the pair is quoted on screen.
+ * `sizeQ × (exit − entry)`, and `sizeQ` carries the sign. `side` here is the
+ * **user-facing** side, so the sign comes from `pnlSign` — a user-facing long
+ * is an engine short, and gains as the price of the local-currency bundle
+ * falls. See `lib/side.ts` for why.
  *
  * Closes are matched to opens FIFO within a market and side, because that is
  * the order the engine itself unwinds a basis.
@@ -63,7 +64,7 @@ export function summarize(trades: VerifiedTrade[]): RealizedSummary {
   for (const trade of ordered) {
     volume += trade.sizeUsdc;
     const key = `${trade.marketId}|${trade.side}`;
-    const sign = trade.side === "long" ? 1 : -1;
+    const sign = pnlSign(trade.side);
 
     if (trade.action === "open") {
       const queue = open.get(key) ?? [];

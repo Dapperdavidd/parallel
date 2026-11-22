@@ -9,6 +9,7 @@ import {
   marketRiskState,
   portfolioState,
 } from "@/lib/server/percolator";
+import { sideOf } from "@/lib/side";
 
 /**
  * F12 — the portfolio, read from the chain rather than from the browser.
@@ -126,7 +127,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           positions: state.legs
             .filter((leg) => leg.assetIndex === market.assetIndex && leg.basisPosQ !== 0n)
             .map((leg) => ({
-              side: leg.basisPosQ > 0n ? "long" : "short",
+              side: sideOf(leg.basisPosQ),
               sizeQ: leg.basisPosQ.toString(),
               notionalAtoms: ((abs(leg.basisPosQ) * risk.effectivePriceE6) / POS_SCALE).toString(),
             })),

@@ -4,6 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { listMarkets } from "@/lib/server/data";
 import { POS_SCALE, marketRiskState, portfolioState } from "@/lib/server/percolator";
 import { devnetConnection } from "@/lib/server/verify-trade";
+import { sideOf } from "@/lib/side";
 
 /**
  * F10 — the state of the liquidity that takes the other side of every trade.
@@ -133,7 +134,10 @@ export async function vaultSnapshot(): Promise<VaultSnapshot> {
         pnlUsdc,
         equityUsdc: capitalUsdc + pnlUsdc,
         inventoryUsdc: leg && leg.basisPosQ < 0n ? -inventory : inventory,
-        inventorySide: !leg ? "flat" : leg.basisPosQ > 0n ? "long" : "short",
+        // In the user-facing convention, like everywhere above the engine
+        // boundary. The vault's side is by construction the opposite of the
+        // trader's, since it is the counterparty.
+        inventorySide: !leg ? "flat" : sideOf(leg.basisPosQ),
         openInterestLongUsdc,
         openInterestShortUsdc,
         quote: unitPrice > 0 ? market.unit / unitPrice : null,

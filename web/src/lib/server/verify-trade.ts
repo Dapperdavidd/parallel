@@ -3,6 +3,7 @@ import "server-only";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { listMarkets, type Trade } from "@/lib/server/data";
 import { notionalAtoms, PERCOLATOR_PROGRAM_ID } from "@/lib/server/percolator";
+import { sideOf } from "@/lib/side";
 
 /**
  * Turn a transaction signature into a trade record we are willing to store.
@@ -87,10 +88,10 @@ export async function verifyTrade(input: VerifyInput): Promise<Trade> {
   const sizeQ = readI128(data, 3);
   const priceE6 = data.readBigUInt64LE(19);
 
-  // On an open the sign of `sizeQ` *is* the side; on a close it is the inverse,
-  // because a close is the exact reverse of the leg it settles. Either way the
-  // stored side is the side of the position, not of the instruction.
-  const side = input.action === "open" ? (sizeQ > 0n ? "long" : "short") : sizeQ < 0n ? "long" : "short";
+  // The stored side is the side of the *position*, in the user-facing
+  // convention (`lib/side.ts`). A close is the exact reverse of the leg it
+  // settles, so its instruction sign is negated before being read back.
+  const side = sideOf(input.action === "open" ? sizeQ : -sizeQ);
 
   return {
     marketId: market.id,
