@@ -14,8 +14,9 @@
  * `max_abs_funding_e9_per_slot = 0`, which disables funding. That was a
  * deliberate choice — FUNDING_DEN lives in the engine crate and is not readable
  * from source, and the parameter is IMMUTABLE after InitMarket, so guessing it
- * would have baked in a wrong value. Pass --with-funding to build a separate
- * market with funding enabled and measure the real rate.
+ * would have baked in a wrong value. Run spike 1 with
+ * `--fresh --with-funding` to build a separate market and have spike 4 assert
+ * whether the deployed program actually settles a nonzero rate.
  *
  *   npm run spike3
  */
@@ -79,6 +80,7 @@ interface State {
   portfolioAFunded?: boolean;
   portfolioB?: string;
   portfolioBFunded?: boolean;
+  fundingEnabled?: boolean;
   [k: string]: unknown;
 }
 
@@ -338,8 +340,10 @@ async function main(): Promise<void> {
   );
 
   // Funding
-  console.log(`\n  funding: ${YELLOW}disabled on this market${OFF} ` +
-    `${DIM}(max_abs_funding_e9_per_slot = 0, immutable — see DECISIONS.md §3.13)${OFF}`);
+  console.log(state.fundingEnabled
+    ? `\n  funding: ${GREEN}enabled${OFF} ${DIM}(measured under an adverse premium in spike 4)${OFF}`
+    : `\n  funding: ${YELLOW}disabled on this market${OFF} ` +
+      `${DIM}(max_abs_funding_e9_per_slot = 0, immutable — see DECISIONS.md §3.13)${OFF}`);
 
   // ---- 6. close ----
   console.log(`\n6. close both sides`);
@@ -382,7 +386,7 @@ async function main(): Promise<void> {
   console.log(`  vault              ${atoms(vault0)} → ${atoms(vault1)}`);
   console.log(`  open trade         ${openMs}ms`);
   console.log(`  close trade        ${closeMs}ms`);
-  console.log(`  funding            disabled by design on this market`);
+  console.log(`  funding            ${state.fundingEnabled ? "enabled; spike 4 measures settlement" : "disabled by design on this market"}`);
   console.log(`  ${DIM}all signatures appended to out/signatures.jsonl${OFF}\n`);
 
   if (!opened || !closed || !flat) process.exitCode = 1;

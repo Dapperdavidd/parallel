@@ -41,6 +41,8 @@ import {
   ixCrank,
   readAssetControlSequences,
 } from "../lib/percolator.js";
+import { PERCOLATOR_PROGRAM_ID } from "../lib/solana.js";
+import { PORTFOLIO_ACCOUNT_LEN } from "../vendor/percolator-v16/constants.js";
 import { parseAsset, parseAssetOracleProfile } from "../vendor/percolator-v16/index.js";
 import { getMarket } from "../lib/markets.js";
 import { shouldPush, type IndexTick } from "../lib/index-math.js";
@@ -158,11 +160,40 @@ export async function crankMarket(
         label: `Crank ${entry.id}`,
       });
       cranked += 1;
-    } catch {
-      idle += 1;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (/custom program error: 0x17\b/i.test(message)) {
+        idle += 1;
+      } else {
+        throw err;
+      }
     }
   }
   return { cranked, idle };
+}
+
+/** Find every Percolator portfolio bound to this market group. */
+export async function discoverMarketPortfolios(
+  conn: ReturnType<typeof getConnection>,
+  entry: RegistryEntry,
+): Promise<PublicKey[]> {
+  const accounts = await conn.getProgramAccounts(PERCOLATOR_PROGRAM_ID, {
+    commitment: "confirmed",
+    filters: [
+      { dataSize: PORTFOLIO_ACCOUNT_LEN },
+      { memcmp: { offset: 16, bytes: entry.market } },
+    ],
+  });
+  return accounts.map((account) => account.pubkey);
+}
+
+async function hasOpenInterest(
+  conn: ReturnType<typeof getConnection>,
+  entry: RegistryEntry,
+): Promise<boolean> {
+  const data = await getAccountData(conn, new PublicKey(entry.market));
+  const asset = parseAsset(data, assetEngineOffset(entry.assetIndex), entry.assetIndex);
+  return asset.oiEffLongQ !== 0n || asset.oiEffShortQ !== 0n;
 }
 
 /** Is this market currently accepting new positions? F2's second half. */
@@ -194,19 +225,36 @@ async function pass(
         `${entry.id.padEnd(9)} ${YELLOW}paused${OFF}  ${DIM}${tick.reason ?? tick.status} · ` +
           `no push, no new positions${OFF}`,
       );
-      continue;
+    } else {
+      const out = await pushMarket(conn, admin, entry, tick, store);
+      if (out.error) {
+        console.log(`${entry.id.padEnd(9)} ${RED}push failed${OFF} ${DIM}${out.error}${OFF}`);
+      } else if (out.pushed) {
+        console.log(
+          `${entry.id.padEnd(9)} ${GREEN}pushed${OFF}  $${tick.unitPriceUsd!.toFixed(6)} ` +
+            `${DIM}${out.reason} · slot ${out.slot}${OFF}`,
+        );
+      } else {
+        console.log(`${entry.id.padEnd(9)} ${DIM}held    ${out.reason}${OFF}`);
+      }
     }
 
-    const out = await pushMarket(conn, admin, entry, tick, store);
-    if (out.error) {
-      console.log(`${entry.id.padEnd(9)} ${RED}push failed${OFF} ${DIM}${out.error}${OFF}`);
-    } else if (out.pushed) {
+    // Cranking is independent of whether this pass produced a safe new mark.
+    // A paused index must not freeze funding or an already-eligible liquidation.
+    try {
+      if (await hasOpenInterest(conn, entry)) {
+        const portfolios = await discoverMarketPortfolios(conn, entry);
+        const result = await crankMarket(conn, admin, entry, portfolios);
+        console.log(
+          `${entry.id.padEnd(9)} ${GREEN}cranked${OFF} ${result.cranked}/${portfolios.length} ` +
+            `${DIM}${result.idle} idle${OFF}`,
+        );
+      }
+    } catch (err) {
       console.log(
-        `${entry.id.padEnd(9)} ${GREEN}pushed${OFF}  $${tick.unitPriceUsd!.toFixed(6)} ` +
-          `${DIM}${out.reason} · slot ${out.slot}${OFF}`,
+        `${entry.id.padEnd(9)} ${RED}crank failed${OFF} ` +
+          `${DIM}${err instanceof Error ? err.message : String(err)}${OFF}`,
       );
-    } else {
-      console.log(`${entry.id.padEnd(9)} ${DIM}held    ${out.reason}${OFF}`);
     }
   }
 }

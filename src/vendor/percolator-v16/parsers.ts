@@ -429,6 +429,10 @@ export interface Portfolio {
   residualCrystallizedLossAtomsTotal: bigint;   // u128 (NEW in 0f87dcb)
   residualSpentPrincipalAtomsTotal: bigint;     // u128 (NEW)
   residualReceivedAtomsTotal: bigint;           // u128 (NEW)
+  fundingLongPaidAtomsTotal: bigint;
+  fundingLongReceivedAtomsTotal: bigint;
+  fundingShortPaidAtomsTotal: bigint;
+  fundingShortReceivedAtomsTotal: bigint;
   feeCredits: bigint;
   cancelDepositEscrow: bigint;
   lastFeeSlot: bigint;
@@ -461,6 +465,10 @@ export function parsePortfolio(data: Buffer): Portfolio {
     residualCrystallizedLossAtomsTotal: u128(data, b + PA.residual_crystallized_loss_atoms_total),
     residualSpentPrincipalAtomsTotal: u128(data, b + PA.residual_spent_principal_atoms_total),
     residualReceivedAtomsTotal: u128(data, b + PA.residual_received_atoms_total),
+    fundingLongPaidAtomsTotal: u128(data, b + PA.funding_long_paid_atoms_total),
+    fundingLongReceivedAtomsTotal: u128(data, b + PA.funding_long_received_atoms_total),
+    fundingShortPaidAtomsTotal: u128(data, b + PA.funding_short_paid_atoms_total),
+    fundingShortReceivedAtomsTotal: u128(data, b + PA.funding_short_received_atoms_total),
     feeCredits: i128(data, b + PA.fee_credits),
     cancelDepositEscrow: u128(data, b + PA.cancel_deposit_escrow),
     lastFeeSlot: u64(data, b + PA.last_fee_slot),

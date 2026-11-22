@@ -83,6 +83,7 @@ interface State {
   portfolioA?: string;
   portfolioB?: string;
   insuranceTopped?: boolean;
+  fundingEnabled?: boolean;
   [k: string]: unknown;
 }
 
@@ -106,6 +107,9 @@ const readPf = async (conn: Conn, pf: PublicKey): Promise<Portfolio> =>
   parsePortfolio(await getAccountData(conn, pf));
 
 const posOf = (p: Portfolio): bigint => p.legs.find((l) => l.assetIndex === 0)?.basisPosQ ?? 0n;
+const fundingTotal = (p: Portfolio): bigint =>
+  p.fundingLongPaidAtomsTotal + p.fundingLongReceivedAtomsTotal +
+  p.fundingShortPaidAtomsTotal + p.fundingShortReceivedAtomsTotal;
 
 async function main(): Promise<void> {
   const conn = getConnection();
@@ -237,7 +241,9 @@ async function main(): Promise<void> {
   );
 
   a = await readPf(conn, pfA);
+  b = await readPf(conn, pfB);
   ({ asset, group } = await readAll(conn, market));
+  const fundingStart = fundingTotal(a) + fundingTotal(b);
   console.log(`  A position ${posOf(a)}  ${DIM}OI long ${asset.oiEffLongQ}, short ${asset.oiEffShortQ}${OFF}`);
   const opened = posOf(a) !== 0n;
   console.log(`  ${opened ? `${GREEN}✓ open${OFF}` : `${RED}✗ failed to open${OFF}`}\n`);
@@ -306,6 +312,8 @@ async function main(): Promise<void> {
   b = await readPf(conn, pfB);
   const vaultBal = (await getAccount(conn, vaultAta)).amount;
   const insuranceDelta = end.group.insurance - insuranceStart;
+  const fundingEnd = fundingTotal(a) + fundingTotal(b);
+  const fundingDelta = fundingEnd - fundingStart;
 
   console.log(`\n${DIM}─ spike 4 result ─${OFF}`);
   console.log(`  entry price        ${usd(entry)}`);
@@ -317,6 +325,8 @@ async function main(): Promise<void> {
   console.log(`  B capital / pnl    ${atoms(b.capital)} / ${atoms(b.pnl)}`);
   console.log(`  insurance          ${atoms(insuranceStart)} → ${atoms(end.group.insurance)}  ` +
     `${insuranceDelta >= 0n ? GREEN : RED}${insuranceDelta >= 0n ? "+" : ""}${atoms(insuranceDelta)}${OFF}`);
+  console.log(`  funding counters   ${fundingStart} → ${fundingEnd}  ` +
+    `${fundingDelta > 0n ? GREEN : YELLOW}${fundingDelta > 0n ? "+" : ""}${fundingDelta} atoms${OFF}`);
   console.log(`  vault              ${atoms(vaultBal)}`);
   console.log(`  market mode        ${end.group.mode} ${DIM}(0 = Live)${OFF}\n`);
 
@@ -324,6 +334,10 @@ async function main(): Promise<void> {
     console.log(`${YELLOW}The position did not liquidate within ${MAX_CRANKS} cranks.${OFF}`);
     console.log(`${DIM}Raise ADVERSE_PCT or MAX_CRANKS — each crank can only move the`);
     console.log(`effective price ${MAX_PRICE_MOVE_BPS_PER_SLOT}bps × up to ${MAX_ACCRUAL_DT_SLOTS} slots.${OFF}`);
+    process.exitCode = 1;
+  }
+  if (state.fundingEnabled && fundingDelta <= 0n) {
+    console.log(`${RED}Funding was enabled but no portfolio funding counter advanced.${OFF}`);
     process.exitCode = 1;
   }
 }

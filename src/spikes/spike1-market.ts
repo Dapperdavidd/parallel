@@ -55,6 +55,7 @@ import {
   readAssetControlSequences,
   vaultAuthority,
   ORACLE_MODE,
+  MAX_ABS_FUNDING_E9_PER_SLOT,
   type AuthMarkWire,
 } from "../lib/percolator.js";
 import { parseAsset, parseAssetOracleProfile } from "../vendor/percolator-v16/index.js";
@@ -74,6 +75,7 @@ interface State {
   market?: string;
   marketAsset?: string;
   authMarkWire?: AuthMarkWire;
+  fundingEnabled?: boolean;
   initialPriceE6?: string;
   createdAt?: string;
 }
@@ -112,6 +114,7 @@ async function liveUnitPriceUsd(): Promise<number> {
 
 async function main(): Promise<void> {
   const fresh = process.argv.includes("--fresh");
+  const withFunding = process.argv.includes("--with-funding");
   const conn = getConnection();
   // --fresh builds a new market (and therefore new portfolios, which are bound
   // to a market) but keeps the collateral mint, which is market-independent and
@@ -122,8 +125,12 @@ async function main(): Promise<void> {
         network: "devnet",
         percolatorProgram: PERCOLATOR_PROGRAM_ID.toBase58(),
         collateralMint: prior.collateralMint,
+        fundingEnabled: withFunding,
       }
     : prior;
+  if (!fresh && withFunding !== Boolean(state.fundingEnabled)) {
+    throw new Error("funding is immutable; rerun with --fresh --with-funding");
+  }
 
   console.log(`\n${DIM}Parallel — spike 1: create a Percolator market for the naira${OFF}`);
   console.log(`${DIM}${new Date().toISOString()} · program ${PERCOLATOR_PROGRAM_ID.toBase58()}${OFF}\n`);
@@ -185,12 +192,14 @@ async function main(): Promise<void> {
       initialPriceE6,
       maxLeverage: getMarket(MARKET_ID).maxLeverage,
       maintenanceMarginBps: 1_000n,
+      maxAbsFundingE9PerSlot: withFunding ? MAX_ABS_FUNDING_E9_PER_SLOT : 0n,
     });
     console.log(
       `  initial_margin_bps ${params.initialMarginBps} (= ${
         10_000 / Number(params.initialMarginBps)
       }x), maintenance ${params.maintenanceMarginBps}`,
     );
+    console.log(`  funding cap ${params.maxAbsFundingE9PerSlot} e9/slot`);
 
     const vaultAuth = vaultAuthority(marketKp.publicKey);
     const vaultAta = getAssociatedTokenAddressSync(mint, vaultAuth, true);

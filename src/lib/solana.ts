@@ -330,7 +330,7 @@ export function logSignature(rec: SigRecord): void {
  * trip a recovery gate (DECISIONS.md §3.4). Always re-read before each call.
  */
 export async function nowSlot(conn: Connection): Promise<bigint> {
-  return BigInt(await conn.getSlot("confirmed"));
+  return BigInt(await withRetry(() => conn.getSlot("confirmed"), "read current slot"));
 }
 
 /** Waits until the chain has advanced past `after`, so the step budget is non-zero. */
