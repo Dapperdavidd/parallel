@@ -2,7 +2,6 @@
 
 import { useCallback } from "react";
 import { useWallets, useSignAndSendTransaction } from "@privy-io/react-auth/solana";
-import bs58 from "bs58";
 import {
   ComputeBudgetProgram,
   Connection,
@@ -35,6 +34,30 @@ const bytesFromBase64 = (value: string): Uint8Array => {
   return Uint8Array.from(decoded, (char) => char.charCodeAt(0));
 };
 
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+/** Encode Privy's binary Solana signature without pulling Node-only shims into the browser. */
+const signatureToBase58 = (bytes: Uint8Array): string => {
+  if (bytes.length === 0) return "";
+  const digits = [0];
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let i = 0; i < digits.length; i += 1) {
+      carry += digits[i]! << 8;
+      digits[i] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  let encoded = "";
+  for (let i = 0; i < bytes.length - 1 && bytes[i] === 0; i += 1) encoded += "1";
+  for (let i = digits.length - 1; i >= 0; i -= 1) encoded += BASE58_ALPHABET[digits[i]];
+  return encoded;
+};
+
 export function usePercolatorTrade() {
   const { wallets } = useWallets();
   const { signAndSendTransaction } = useSignAndSendTransaction();
@@ -49,8 +72,8 @@ export function usePercolatorTrade() {
           ? (result as { signature: unknown }).signature
           : result;
       if (typeof signature === "string") return signature;
-      if (signature instanceof Uint8Array) return bs58.encode(signature);
-      if (Array.isArray(signature)) return bs58.encode(Uint8Array.from(signature));
+      if (signature instanceof Uint8Array) return signatureToBase58(signature);
+      if (Array.isArray(signature)) return signatureToBase58(Uint8Array.from(signature));
       throw new Error("The wallet returned an unreadable transaction signature");
     },
     [wallets, signAndSendTransaction],
