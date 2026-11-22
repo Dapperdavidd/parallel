@@ -35,8 +35,17 @@ interface TickRow {
   pushed_slot: number | null;
 }
 
-const toTick = (r: TickRow): StoredTick =>
-  ({
+const toTick = (r: TickRow): StoredTick => {
+  const payload = r.breakdown as
+    | StoredTick["breakdown"]
+    | {
+        readings?: StoredTick["breakdown"];
+        dropped?: StoredTick["dropped"];
+        failed?: StoredTick["failed"];
+      };
+  const legacy = Array.isArray(payload);
+
+  return {
     market: r.market_id,
     ts: r.ts,
     median: r.median,
@@ -46,12 +55,13 @@ const toTick = (r: TickRow): StoredTick =>
     status: r.status,
     reason: r.reason ?? undefined,
     sourcesUsed: r.sources_used ?? [],
-    dropped: [],
-    failed: [],
-    breakdown: (r.breakdown ?? []) as StoredTick["breakdown"],
+    dropped: legacy ? [] : (payload.dropped ?? []),
+    failed: legacy ? [] : (payload.failed ?? []),
+    breakdown: legacy ? payload : (payload.readings ?? []),
     pushedTx: r.pushed_tx,
     pushedSlot: r.pushed_slot,
-  }) as StoredTick;
+  } as StoredTick;
+};
 
 const fromTick = (t: StoredTick): TickRow => ({
   market_id: t.market,

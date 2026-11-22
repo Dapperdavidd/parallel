@@ -132,6 +132,17 @@ alter table trades      enable row level security;
 alter table hedges      enable row level security;
 alter table users       enable row level security;
 
+-- New Supabase projects can be created with automatic Data API grants
+-- disabled. RLS policies do not grant SQL privileges by themselves, so make
+-- the intended boundary explicit: anonymous/authenticated clients may read
+-- only public market data, while the server-only secret role owns all writes.
+grant usage on schema public to anon, authenticated, service_role;
+grant select on markets, sources, index_ticks, candles, trades
+  to anon, authenticated;
+grant all privileges on markets, sources, index_ticks, candles, trades, hedges, users
+  to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
 do $$
 begin
   if not exists (select 1 from pg_policies where tablename = 'markets' and policyname = 'public read') then
