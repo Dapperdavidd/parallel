@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { createContext, createElement, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { useWallets, useSignAndSendTransaction } from "@privy-io/react-auth/solana";
 import {
   ComputeBudgetProgram,
@@ -58,7 +58,7 @@ const signatureToBase58 = (bytes: Uint8Array): string => {
   return encoded;
 };
 
-export function usePercolatorTrade() {
+function usePercolatorTradeValue() {
   const { wallets } = useWallets();
   const { signAndSendTransaction } = useSignAndSendTransaction();
 
@@ -156,5 +156,42 @@ export function usePercolatorTrade() {
     [wallets, ensurePortfolio, send],
   );
 
-  return { open };
+  const close = useCallback(
+    async (input: { code: string }) => {
+      const wallet = wallets[0];
+      if (!wallet) throw new Error("Your Solana wallet is not ready");
+      const marketResponse = await fetch("/api/markets", { cache: "no-store" });
+      const marketBody = (await marketResponse.json()) as { markets: MarketConfig[] };
+      const market = marketBody.markets.find((entry) => entry.code === input.code);
+      if (!market) throw new Error("Market configuration is unavailable");
+      const portfolio = localStorage.getItem(`parallel.portfolio.${market.id}.${wallet.address}`);
+      if (!portfolio) throw new Error("No on-chain portfolio was found for this market");
+
+      const prepared = await fetch("/api/trade/close/prepare", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ wallet: wallet.address, portfolio, marketId: market.id }),
+      });
+      const body = (await prepared.json()) as { transaction?: string; error?: string };
+      if (!prepared.ok || !body.transaction) throw new Error(body.error ?? "Close preparation failed");
+      return send(bytesFromBase64(body.transaction));
+    },
+    [wallets, send],
+  );
+
+  return useMemo(() => ({ open, close }), [open, close]);
+}
+
+type PercolatorTrade = ReturnType<typeof usePercolatorTradeValue>;
+const PercolatorTradeContext = createContext<PercolatorTrade | null>(null);
+
+export function PercolatorTradeProvider({ children }: { children: ReactNode }) {
+  const value = usePercolatorTradeValue();
+  return createElement(PercolatorTradeContext.Provider, { value }, children);
+}
+
+export function usePercolatorTrade(): PercolatorTrade {
+  const value = useContext(PercolatorTradeContext);
+  if (!value) throw new Error("usePercolatorTrade must be used inside PercolatorTradeProvider");
+  return value;
 }

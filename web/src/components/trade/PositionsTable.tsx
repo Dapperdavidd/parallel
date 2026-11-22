@@ -1,20 +1,46 @@
 "use client";
 
+import { useState } from "react";
 import { byCode, fmt, positionPnl } from "@/lib/mock";
 import { useDemo } from "@/lib/store";
 import { useToast } from "@/components/Toast";
+import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
 
 export function PositionsTable() {
-  const { positions, signedIn, closePosition } = useDemo();
+  const { positions, signedIn, market, closePosition } = useDemo();
   const toast = useToast();
+  const { close } = usePercolatorTrade();
+  const [closing, setClosing] = useState<number | null>(null);
 
   if (positions.length === 0) {
     return (
-      <p style={{ margin: 0, padding: "6px 16px 18px", fontSize: 13, color: "var(--ink3)" }}>
-        {signedIn
-          ? "No open positions yet. Open one from the panel."
-          : "Sign in to see your positions."}
-      </p>
+      <div style={{ padding: "6px 16px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--ink3)" }}>
+          {signedIn
+            ? "No browser position is saved. You can still close an on-chain position in this market."
+            : "Sign in to see your positions."}
+        </p>
+        {signedIn && (
+          <button
+            type="button"
+            className="closebtn"
+            disabled={closing !== null}
+            onClick={async () => {
+              try {
+                setClosing(-1);
+                const signature = await close({ code: market });
+                toast(`Closed on devnet · ${signature.slice(0, 8)}…`);
+              } catch (error) {
+                toast(error instanceof Error ? error.message : "Close failed");
+              } finally {
+                setClosing(null);
+              }
+            }}
+          >
+            {closing !== null ? "Closing…" : `Close on-chain ${market}`}
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -53,12 +79,21 @@ export function PositionsTable() {
                 <button
                   type="button"
                   className="closebtn"
-                  onClick={() => {
-                    const realised = closePosition(p.id);
-                    toast(`Closed · ${realised >= 0 ? "+" : ""}${fmt(realised)} tUSDC`);
+                  disabled={closing === p.id}
+                  onClick={async () => {
+                    try {
+                      setClosing(p.id);
+                      const signature = await close({ code: p.c });
+                      const realised = closePosition(p.id);
+                      toast(`Closed on devnet · ${realised >= 0 ? "+" : ""}${fmt(realised)} tUSDC · ${signature.slice(0, 8)}…`);
+                    } catch (error) {
+                      toast(error instanceof Error ? error.message : "Close failed");
+                    } finally {
+                      setClosing(null);
+                    }
                   }}
                 >
-                  Close
+                  {closing === p.id ? "Closing…" : "Close"}
                 </button>
               </td>
             </tr>

@@ -6,6 +6,7 @@ export const PERCOLATOR_PROGRAM_ID = new PublicKey(
   "Bu1J8eQQN2mNnUgisSEd5StBG6zDaRb7fwDjN34VzgLG",
 );
 export const POS_SCALE = 1_000_000n;
+export const PORTFOLIO_ACCOUNT_LEN = 9_411;
 
 const MARKET_GROUP_OFF = 464;
 const MARKET_GROUP_HEADER_LEN = 726;
@@ -14,6 +15,13 @@ const ASSET_STATE_OFF = MARKET_GROUP_OFF + MARKET_GROUP_HEADER_LEN + ASSET_ORACL
 const EFFECTIVE_PRICE_OFF = ASSET_STATE_OFF + 25;
 const OI_LONG_OFF = ASSET_STATE_OFF + 273;
 const OI_SHORT_OFF = ASSET_STATE_OFF + 289;
+const PORTFOLIO_STATE_OFF = 16;
+const PORTFOLIO_OWNER_OFF = PORTFOLIO_STATE_OFF + 100;
+const PORTFOLIO_CAPITAL_OFF = PORTFOLIO_STATE_OFF + 132;
+const PORTFOLIO_PNL_OFF = PORTFOLIO_STATE_OFF + 148;
+const PORTFOLIO_LEGS_OFF = PORTFOLIO_STATE_OFF + 340;
+const PORTFOLIO_LEG_LEN = 144;
+const PORTFOLIO_LEG_COUNT = 16;
 
 const u16le = (value: number): Buffer => {
   const out = Buffer.alloc(2);
@@ -34,6 +42,39 @@ const i128le = (value: bigint): Buffer => {
 };
 const u128 = (data: Buffer, offset: number): bigint =>
   data.readBigUInt64LE(offset) + (data.readBigUInt64LE(offset + 8) << 64n);
+const i128 = (data: Buffer, offset: number): bigint => {
+  const value = u128(data, offset);
+  return value >= 1n << 127n ? value - (1n << 128n) : value;
+};
+
+export interface PortfolioLegState {
+  assetIndex: number;
+  marketId: bigint;
+  side: number;
+  basisPosQ: bigint;
+}
+
+export function portfolioState(data: Buffer) {
+  if (data.length !== PORTFOLIO_ACCOUNT_LEN) throw new Error("Unexpected Percolator portfolio size");
+  const legs: PortfolioLegState[] = [];
+  for (let index = 0; index < PORTFOLIO_LEG_COUNT; index += 1) {
+    const offset = PORTFOLIO_LEGS_OFF + index * PORTFOLIO_LEG_LEN;
+    if (data.readUInt8(offset) === 0) continue;
+    legs.push({
+      assetIndex: data.readUInt32LE(offset + 1),
+      marketId: data.readBigUInt64LE(offset + 5),
+      side: data.readUInt8(offset + 13),
+      basisPosQ: i128(data, offset + 14),
+    });
+  }
+  return {
+    marketGroupId: new PublicKey(data.subarray(PORTFOLIO_STATE_OFF, PORTFOLIO_STATE_OFF + 32)),
+    owner: new PublicKey(data.subarray(PORTFOLIO_OWNER_OFF, PORTFOLIO_OWNER_OFF + 32)),
+    capitalAtoms: u128(data, PORTFOLIO_CAPITAL_OFF),
+    pnlAtoms: i128(data, PORTFOLIO_PNL_OFF),
+    legs,
+  };
+}
 
 export function marketRiskState(data: Buffer) {
   if (data.length < OI_SHORT_OFF + 16) throw new Error("Percolator market account is too short");

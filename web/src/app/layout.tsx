@@ -5,6 +5,7 @@ import { DemoProvider } from "@/lib/store";
 import { ToastProvider } from "@/components/Toast";
 import { LiveProvider } from "@/lib/live";
 import { WalletProvider } from "@/lib/privy";
+import { PercolatorTradeProvider } from "@/lib/usePercolatorTrade";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -45,11 +46,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* LiveProvider lays the real index over the sample data, so every
             screen shows live prices without having been rebuilt. */}
         <WalletProvider>
-          <DemoProvider>
-            <LiveProvider>
-              <ToastProvider>{children}</ToastProvider>
-            </LiveProvider>
-          </DemoProvider>
+          <PercolatorTradeProvider>
+            <DemoProvider>
+              <LiveProvider>
+                <ToastProvider>{children}</ToastProvider>
+              </LiveProvider>
+            </DemoProvider>
+          </PercolatorTradeProvider>
         </WalletProvider>
       </body>
     </html>
