@@ -123,7 +123,9 @@ function usePercolatorTradeValue() {
     [wallets, send],
   );
 
-  const open = useCallback(
+  // Returns the portfolio and market alongside the signature, because hedge
+  // mode has to file its intent against the exact position it just opened.
+  const openWithContext = useCallback(
     async (input: { code: string; side: "long" | "short"; marginUsdc: number; leverage: number }) => {
       const wallet = wallets[0];
       if (!wallet) throw new Error("Your Solana wallet is not ready");
@@ -164,9 +166,50 @@ function usePercolatorTradeValue() {
           leverage: input.leverage,
         }),
       }).catch(() => undefined);
-      return signature;
+      return { signature, portfolio, marketId: market.id };
     },
     [wallets, ensurePortfolio, send],
+  );
+
+  const open = useCallback(
+    async (input: { code: string; side: "long" | "short"; marginUsdc: number; leverage: number }) =>
+      (await openWithContext(input)).signature,
+    [openWithContext],
+  );
+
+  /**
+   * F9 — a hedge is a 1x long opened through the ordinary guarded path, plus
+   * the intent filed against it. The position is real the moment Privy returns
+   * a signature; if filing the intent then fails, the trade still happened, so
+   * this reports `recorded: false` rather than claiming the hedge failed.
+   */
+  const hedge = useCallback(
+    async (input: { code: string; amountLocal: number; marginUsdc: number; dueDate: string }) => {
+      const wallet = wallets[0];
+      if (!wallet) throw new Error("Your Solana wallet is not ready");
+      const context = await openWithContext({
+        code: input.code,
+        side: "long",
+        marginUsdc: input.marginUsdc,
+        leverage: 1,
+      });
+      const recorded = await fetch("/api/hedge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          signature: context.signature,
+          wallet: wallet.address,
+          portfolio: context.portfolio,
+          marketId: context.marketId,
+          amountLocal: input.amountLocal,
+          dueDate: input.dueDate,
+        }),
+      })
+        .then((response) => response.ok)
+        .catch(() => false);
+      return { signature: context.signature, recorded };
+    },
+    [wallets, openWithContext],
   );
 
   const close = useCallback(
@@ -210,7 +253,7 @@ function usePercolatorTradeValue() {
     [wallets, send],
   );
 
-  return useMemo(() => ({ open, close }), [open, close]);
+  return useMemo(() => ({ open, close, hedge }), [open, close, hedge]);
 }
 
 type PercolatorTrade = ReturnType<typeof usePercolatorTradeValue>;

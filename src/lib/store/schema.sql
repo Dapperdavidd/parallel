@@ -103,14 +103,20 @@ create index if not exists trades_market_ts_idx on trades (market_id, ts desc);
 create index if not exists trades_wallet_ts_idx on trades (wallet, ts desc);
 
 -- ----------------------------------------------------------------- hedges --
+-- A hedge is an ordinary long position plus the two things that make it a
+-- hedge rather than a trade: how much local currency the person is protecting,
+-- and the date they need it by. The position itself lives in `trades`; these
+-- rows only carry the intent. `tx_signature` is the link, and it is unique, so
+-- recording the same hedge twice is a no-op rather than a duplicate.
 create table if not exists hedges (
-  id         bigserial primary key,
-  wallet     text not null,
-  market_id  text not null references markets(id) on delete cascade,
-  amount_usd double precision not null,
-  due_date   date not null,
-  trade_id   bigint references trades(id) on delete set null,
-  created_at timestamptz not null default now()
+  id           bigserial primary key,
+  wallet       text not null,
+  market_id    text not null references markets(id) on delete cascade,
+  amount_local double precision not null,
+  amount_usd   double precision not null,
+  due_date     date not null,
+  tx_signature text not null unique,
+  created_at   timestamptz not null default now()
 );
 create index if not exists hedges_wallet_idx on hedges (wallet);
 

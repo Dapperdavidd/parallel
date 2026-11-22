@@ -352,6 +352,87 @@ export function recordTrade(trade: Trade): Promise<void> {
   return tradeWrite;
 }
 
+// -------------------------------------------------------------- hedges --
+
+/**
+ * F9 — the intent behind a hedge.
+ *
+ * The position itself is an ordinary verified row in `trades`; a hedge adds
+ * only what the trade cannot say: how much local currency is being protected
+ * and the date it is needed by. `txSignature` links the two and is the
+ * idempotency key, so a retried write is a no-op.
+ */
+export interface Hedge {
+  wallet: string;
+  marketId: string;
+  amountLocal: number;
+  amountUsd: number;
+  dueDate: string;
+  txSignature: string;
+  createdAt: string;
+}
+
+export async function recentHedges(wallet: string, limit = 40): Promise<Hedge[]> {
+  const client = db();
+  if (client) {
+    const { data } = await client
+      .from("hedges")
+      .select("*")
+      .eq("wallet", wallet)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (data) {
+      return data.map((h) => ({
+        wallet: h.wallet,
+        marketId: h.market_id,
+        amountLocal: h.amount_local,
+        amountUsd: h.amount_usd,
+        dueDate: h.due_date,
+        txSignature: h.tx_signature,
+        createdAt: h.created_at,
+      }));
+    }
+  }
+  const all = await readLines<Hedge>(join(DATA_DIR, "hedges.jsonl"));
+  const mine = all.filter((row) => row.wallet === wallet);
+  return mine.slice(Math.max(0, mine.length - limit)).reverse();
+}
+
+let hedgeWrite = Promise.resolve();
+
+async function recordHedgeUnlocked(hedge: Hedge): Promise<void> {
+  const client = db();
+  if (client) {
+    const { error } = await client.from("hedges").upsert(
+      {
+        wallet: hedge.wallet,
+        market_id: hedge.marketId,
+        amount_local: hedge.amountLocal,
+        amount_usd: hedge.amountUsd,
+        due_date: hedge.dueDate,
+        tx_signature: hedge.txSignature,
+        created_at: hedge.createdAt,
+      },
+      { onConflict: "tx_signature", ignoreDuplicates: true },
+    );
+    if (error) throw error;
+    return;
+  }
+
+  const path = join(DATA_DIR, "hedges.jsonl");
+  const existing = await readLines<Hedge>(path);
+  if (existing.some((row) => row.txSignature === hedge.txSignature)) return;
+  await mkdir(DATA_DIR, { recursive: true });
+  await appendFile(path, `${JSON.stringify(hedge)}\n`, "utf8");
+}
+
+/** Serialized like trade writes, so two concurrent retries cannot both append. */
+export function recordHedge(hedge: Hedge): Promise<void> {
+  const write = () => recordHedgeUnlocked(hedge);
+  hedgeWrite = hedgeWrite.then(write, write);
+  return hedgeWrite;
+}
+
 // -------------------------------------------------------- official history --
 
 export interface OfficialPoint {
