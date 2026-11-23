@@ -36,6 +36,10 @@ export interface OfficialPoint {
 const file = (marketId: string): string =>
   join(DATA_DIR, "official", `${marketId.replace("/", "-")}.json`);
 
+/** Committed copy the web app reads, so a deploy has the history too. */
+const BUNDLE_DIR = join("web", "src", "data");
+const BUNDLE_FILE = join(BUNDLE_DIR, "official-rates.json");
+
 export function readOfficialHistory(marketId: string): OfficialPoint[] {
   const path = file(marketId);
   if (!existsSync(path)) return [];
@@ -134,6 +138,24 @@ async function main(): Promise<void> {
       `${m.id.padEnd(9)} ${String(points.length).padStart(4)} days  ${DIM}${first} → ${last}${OFF}`,
     );
   }
+
+  // A committed bundle for the web app.
+  //
+  // `data/` is gitignored, so on a deployed instance those per-market files do
+  // not exist and the charts would lose their entire pre-launch history. This
+  // is published reference data — static, public, not secret and not live
+  // state — so it belongs in the repo. Compact form: `[date, rate]` pairs with
+  // the rate rounded to 6 significant figures, which is far finer than any
+  // published rate and keeps the file a third of the raw size.
+  const bundle: Record<string, [string, number][]> = {};
+  for (const m of LAUNCH_MARKETS) {
+    bundle[m.id] = [...existing.get(m.id)!.values()]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((pt) => [pt.date, Number(pt.rate.toPrecision(6))]);
+  }
+  mkdirSync(BUNDLE_DIR, { recursive: true });
+  writeFileSync(BUNDLE_FILE, JSON.stringify(bundle));
+  console.log(`${DIM}bundle → ${BUNDLE_FILE}${OFF}`);
 
   console.log(
     `\n${GREEN}done${OFF} ${DIM}${fetched} days fetched, ${cached} already held, ` +

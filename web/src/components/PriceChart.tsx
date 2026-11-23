@@ -20,6 +20,10 @@ interface ChartFeed {
   ticks: { ts: string; price: number; median: number | null }[];
   official: number | null;
   officialHistory: { date: string; rate: number }[];
+  /** Real OHLC from the published daily rates; null when a bucket is one day. */
+  officialCandles:
+    | { openTs: string; open: number; high: number; low: number; close: number; days: number }[]
+    | null;
 }
 
 /**
@@ -61,12 +65,14 @@ export function PriceChart({
   /** The viewer's confirmed trades in this market. */
   trades: { ts: string; side: "long" | "short"; action: string }[];
   /** Tells the caller what the chart is actually showing, so it can say so. */
-  onSource?: (s: { mode: "index" | "official" | "sample"; indexFrom: string | null }) => void;
+  onSource?: (s: { mode: "index" | "official-candles" | "official" | "sample"; indexFrom: string | null }) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const officialRef = useRef<ISeriesApi<"Line"> | null>(null);
+  /** The `market|timeframe` whose data the current viewport was fitted to. */
+  const fittedRef = useRef<string>("");
   const markRef = useRef<IPriceLine | null>(null);
 
   // Create once.
@@ -80,18 +86,51 @@ export function PriceChart({
         textColor: "#868CA2",
         fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
         fontSize: 11,
+        // The library draws a TradingView logo here by default, linking out to
+        // tradingview.com. Its licence allows disabling it once the attribution
+        // notice is carried elsewhere, which /docs/about now does. It was also
+        // simply wrong for us: TradingView has no USD/NGN, so the link led
+        // somewhere that cannot show the market the user was looking at.
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: "#161C2E" },
         horzLines: { color: "#161C2E" },
       },
       rightPriceScale: { borderColor: "#1C2238" },
-      timeScale: { borderColor: "#1C2238", timeVisible: true, secondsVisible: false },
+      timeScale: {
+        borderColor: "#1C2238",
+        timeVisible: true,
+        secondsVisible: false,
+        barSpacing: 9,
+        minBarSpacing: 0.8,
+        rightOffset: 4,
+        // Resizing the panel should move the frame, not re-fit the data and
+        // throw away wherever the viewer had scrolled to.
+        lockVisibleTimeRangeOnResize: true,
+      },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: { color: "#3D5CF5", labelBackgroundColor: "#3D5CF5" },
         horzLine: { color: "#3D5CF5", labelBackgroundColor: "#3D5CF5" },
       },
+      // Pan and zoom spelled out rather than left to the defaults, so wheel,
+      // drag, pinch and axis-drag all work the way they do on a desktop
+      // charting tool. `minBarSpacing` is what decides how far in you can go:
+      // the default stops you well before the candles get large.
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: { time: true, price: true },
+        axisDoubleClickReset: { time: true, price: true },
+      },
+      kineticScroll: { mouse: false, touch: true },
       autoSize: true,
     });
 
@@ -118,7 +157,15 @@ export function PriceChart({
     });
 
     chartRef.current = chart;
+
+    // Double-click anywhere on the chart frames the whole series again. The
+    // library only does this on the axes, and once zoom survives a refresh the
+    // viewer needs an obvious way back out.
+    const reset = (): void => chart.timeScale().fitContent();
+    host.addEventListener("dblclick", reset);
+
     return () => {
+      host.removeEventListener("dblclick", reset);
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
@@ -166,13 +213,26 @@ export function PriceChart({
     });
 
     let data: Candle[];
-    let mode: "index" | "official" | "sample";
+    let mode: "index" | "official-candles" | "official" | "sample";
     let backfill: { time: number; value: number }[] = [];
 
     if (real.length >= MIN_REAL_CANDLES) {
       // Enough measured history to draw the index itself.
       data = real.map(toCandle);
       mode = "index";
+    } else if (feed?.officialCandles && feed.officialCandles.length > 0) {
+      // Not enough measured history at this timeframe — a weekly or monthly
+      // chart of a two-day-old index is one candle. The published daily rates
+      // aggregate into real candles, so draw those instead of a lone bar above
+      // a flat line. One candle series, one quantity: these are official
+      // rates, and the caption says so. The dashed overlay is dropped, since
+      // the candles already *are* the official series, and the labelled mark
+      // line still shows where the street index is right now.
+      data = feed.officialCandles.map((c) => ({
+        time: Math.floor(new Date(c.openTs).getTime() / 1000),
+        open: c.open, high: c.high, low: c.low, close: c.close,
+      }));
+      mode = "official-candles";
     } else if (officialPts.length > 0) {
       // Pre-launch. Draw the published official rate as a line — it is a
       // daily publication with no intraday range, so candles would imply a
@@ -204,7 +264,11 @@ export function PriceChart({
     );
     // The dashed line is either the official-rate history (pre-launch) or the
     // current official rate drawn flat across the measured span.
-    if (backfill.length > 0) {
+    if (mode === "official-candles") {
+      // The candles already are the official series; a second copy of it as a
+      // line would just be noise.
+      official.setData([]);
+    } else if (backfill.length > 0) {
       official.setData(backfill.map((b) => ({ time: b.time as UTCTimestamp, value: b.value })));
     } else {
       const officialRate = feed?.official ?? market.off;
@@ -255,7 +319,16 @@ export function PriceChart({
         }),
     );
 
-    chart.timeScale().fitContent();
+    // Fit the frame only when the dataset itself changes — a new market or a
+    // new timeframe. The live price poll hands back a fresh `market` object
+    // every 30 seconds, and fitting on that was silently undoing the viewer's
+    // zoom and scroll twice a minute, which is why the chart felt like it
+    // fought back. Double-click resets it deliberately instead.
+    const key = `${market.c}|${timeframe}`;
+    if (fittedRef.current !== key) {
+      chart.timeScale().fitContent();
+      fittedRef.current = key;
+    }
   }, [market, timeframe, trades, feed, onSource]);
 
   return (

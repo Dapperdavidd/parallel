@@ -33,6 +33,12 @@ export function EquityChart({ data, up }: { data: CurvePoint[]; up: boolean }) {
         textColor: "#868CA2",
         fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
         fontSize: 11,
+        // The library draws a TradingView logo here by default, linking out to
+        // tradingview.com. Its licence allows disabling it once the attribution
+        // notice is carried elsewhere, which /docs/about now does. It was also
+        // simply wrong for us: TradingView has no USD/NGN, so the link led
+        // somewhere that cannot show the market the user was looking at.
+        attributionLogo: false,
       },
       grid: { vertLines: { visible: false }, horzLines: { color: "#141A2B" } },
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.16, bottom: 0.06 } },

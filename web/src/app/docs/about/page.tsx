@@ -30,6 +30,20 @@ export default function AboutPage() {
         engine handles margin, funding and liquidations.
       </p>
 
+      <h2 className="doc-h2">Credits</h2>
+      <p>
+        Charts are drawn with{" "}
+        <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer" className="doc-link">
+          TradingView
+        </a>
+        &rsquo;s Lightweight Charts, used under the Apache 2.0 licence. Prices are the
+        venues&rsquo; own, listed on the{" "}
+        <Link href="/open-index" className="doc-link">
+          open index
+        </Link>
+        . The perpetuals engine is Percolator.
+      </p>
+
       <div className="doc-cta">
         <Link href="/app/trade" className="btn btn-pri" style={{ height: 50, padding: "0 26px" }}>
           Open the app
