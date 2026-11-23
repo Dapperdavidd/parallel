@@ -211,8 +211,22 @@ export interface SourceReading {
   ms: number;
 }
 
+/**
+ * A venue either answers quickly or is being filtered, so the read budget is
+ * deliberately short.
+ *
+ * The default elsewhere is 12s, which was costing a whole pass ~40s on a
+ * network that blocks most venues at TCP connect: the time is spent waiting on
+ * hosts that will never answer. Six seconds is far more than any reachable
+ * venue needs — the ones that work here answer in well under a second — and it
+ * lets the shorter breaker cooldown retry often without the pass getting long.
+ * See DECISIONS.md §7.18.
+ */
+const SOURCE_TIMEOUT_MS = 6_000;
+
 export async function readSource(s: SourceDef, opts?: FetchOpts): Promise<SourceReading> {
   const t0 = Date.now();
+  opts = { timeoutMs: SOURCE_TIMEOUT_MS, ...opts };
   const base = { id: s.id, label: s.label, kind: s.kind };
   try {
     const rate = s.parse(await fetchJson(s.url, opts));

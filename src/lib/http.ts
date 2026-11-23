@@ -23,12 +23,40 @@ export interface FetchOpts {
  * venues can eat the whole budget and push the cadence off schedule.
  *
  * After `BREAKER_FAILURES` consecutive connection failures a host is skipped
- * for `BREAKER_COOLDOWN_MS`, and the market pauses on its own rules rather
- * than on a stopwatch. One success closes the breaker.
+ * for a cooldown that lengthens with each trip, and the market pauses on its
+ * own rules rather than on a stopwatch. One success closes the breaker
+ * completely, including the backoff.
  */
 const BREAKER_FAILURES = 2;
-const BREAKER_COOLDOWN_MS = 5 * 60 * 1000;
-const breaker = new Map<string, { failures: number; openUntil: number }>();
+
+/**
+ * Cooldown grows with each successive trip, rather than being a flat five
+ * minutes.
+ *
+ * A flat long cooldown is right for a host that is genuinely dead and wrong for
+ * one behind an intermittent filter, and we measurably have the second case: on
+ * 2026-11-23 the venues answered roughly a quarter of the time, so a venue was
+ * tripping, going quiet for five minutes, and taking whole markets with it.
+ * Worse, the breaker is keyed by *host*, and `www.binance.com` is the P2P source
+ * for seven markets while `www.okx.com` serves five — so one trip blacked out
+ * several markets at once and USD/KES, GHS, EGP and PKR, whose only two sources
+ * are those hosts, sat at 0% availability.
+ *
+ * Starting at 30s means a flaky host is retried on the next tick (the service
+ * ticks every 120s) while a dead one still backs off to five minutes within a
+ * few passes, which is what keeps a pass fast. See DECISIONS.md §7.18.
+ */
+const BREAKER_COOLDOWN_STEPS_MS = [30_000, 60_000, 150_000, 300_000];
+
+/**
+ * `trips` counts how many times this host has gone to cooldown, so the backoff
+ * survives the half-open probe that resets `failures`.
+ */
+const breaker = new Map<string, { failures: number; openUntil: number; trips: number }>();
+
+/** Half-open: one trial request is allowed the moment a cooldown expires. */
+const cooldownFor = (trips: number): number =>
+  BREAKER_COOLDOWN_STEPS_MS[Math.min(trips, BREAKER_COOLDOWN_STEPS_MS.length - 1)]!;
 
 /** Connection-level failures trip the breaker; an HTTP error or bad JSON does not. */
 const isConnectFailure = (err: unknown): boolean => {
@@ -86,11 +114,15 @@ export async function fetchJson<T = unknown>(
     } catch (err) {
       lastErr = err;
       if (isConnectFailure(err)) {
-        const prev = breaker.get(host)?.failures ?? 0;
-        const failures = prev + 1;
+        const prev = breaker.get(host);
+        const failures = (prev?.failures ?? 0) + 1;
+        const tripping = failures >= BREAKER_FAILURES;
+        const trips = (prev?.trips ?? 0) + (tripping ? 1 : 0);
         breaker.set(host, {
           failures,
-          openUntil: failures >= BREAKER_FAILURES ? Date.now() + BREAKER_COOLDOWN_MS : 0,
+          // `trips - 1`, so the first trip takes the first (shortest) step.
+          openUntil: tripping ? Date.now() + cooldownFor(trips - 1) : 0,
+          trips,
         });
         // Retrying a host we cannot connect to only spends the budget again.
         break;
