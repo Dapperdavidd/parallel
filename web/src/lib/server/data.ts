@@ -80,12 +80,40 @@ const REGISTRY = process.env.PARALLEL_REGISTRY ?? join(process.cwd(), "..", "mar
 
 let supabase: SupabaseClient | null | undefined;
 
+/**
+ * The database client, or null when none is configured.
+ *
+ * **Service role, not anon.** Every caller in this module is `server-only`, so
+ * the key never reaches a browser, and the schema was written on the
+ * assumption that writes and private tables belong to the service role:
+ * `hedges` has no anon read policy at all, and no table grants anon `insert`.
+ * Preferring the anon key here meant a configured database silently refused
+ * every write and every hedge read — see DECISIONS.md §7.18.
+ *
+ * The anon key stays in the environment because it is the right key for a
+ * browser, which is not what this file is.
+ */
 function db(): SupabaseClient | null {
   if (supabase !== undefined) return supabase;
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
   supabase = url && key ? createClient(url, key, { auth: { persistSession: false } }) : null;
   return supabase;
+}
+
+/**
+ * A configured database is authoritative: never quietly answer from the local
+ * files instead.
+ *
+ * The files are the *other* backend, for a machine with no credentials — not a
+ * safety net underneath this one. Falling through on error is what hid the
+ * permission failures above, answering with stale local history as though it
+ * were live. A real failure should be loud.
+ */
+function must<T>(result: { data: T | null; error: { message: string } | null }, what: string): T {
+  if (result.error) throw new Error(`supabase ${what}: ${result.error.message}`);
+  if (result.data === null) throw new Error(`supabase ${what}: no rows returned`);
+  return result.data;
 }
 
 /** True when the pipeline has produced anything for us to show. */
@@ -295,20 +323,17 @@ export async function recentTrades(marketId: string | null, limit = 40): Promise
   if (client) {
     let q = client.from("trades").select("*").order("ts", { ascending: false }).limit(limit);
     if (marketId) q = q.eq("market_id", marketId);
-    const { data } = await q;
-    if (data) {
-      return data.map((t) => ({
-        marketId: t.market_id,
-        wallet: t.wallet,
-        side: t.side,
-        action: t.action,
-        sizeUsdc: t.size_usdc,
-        leverage: t.leverage,
-        price: t.price,
-        txSignature: t.tx_signature,
-        ts: t.ts,
-      }));
-    }
+    return must(await q, "read trades").map((t) => ({
+      marketId: t.market_id,
+      wallet: t.wallet,
+      side: t.side,
+      action: t.action,
+      sizeUsdc: t.size_usdc,
+      leverage: t.leverage,
+      price: t.price,
+      txSignature: t.tx_signature,
+      ts: t.ts,
+    }));
   }
   const all = await readLines<Trade>(join(DATA_DIR, "trades.jsonl"));
   const filtered = marketId ? all.filter((t) => t.marketId === marketId) : all;
@@ -375,23 +400,23 @@ export interface Hedge {
 export async function recentHedges(wallet: string, limit = 40): Promise<Hedge[]> {
   const client = db();
   if (client) {
-    const { data } = await client
-      .from("hedges")
-      .select("*")
-      .eq("wallet", wallet)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-    if (data) {
-      return data.map((h) => ({
-        wallet: h.wallet,
-        marketId: h.market_id,
-        amountLocal: h.amount_local,
-        amountUsd: h.amount_usd,
-        dueDate: h.due_date,
-        txSignature: h.tx_signature,
-        createdAt: h.created_at,
-      }));
-    }
+    return must(
+      await client
+        .from("hedges")
+        .select("*")
+        .eq("wallet", wallet)
+        .order("created_at", { ascending: false })
+        .limit(limit),
+      "read hedges",
+    ).map((h) => ({
+      wallet: h.wallet,
+      marketId: h.market_id,
+      amountLocal: h.amount_local,
+      amountUsd: h.amount_usd,
+      dueDate: h.due_date,
+      txSignature: h.tx_signature,
+      createdAt: h.created_at,
+    }));
   }
   const all = await readLines<Hedge>(join(DATA_DIR, "hedges.jsonl"));
   const mine = all.filter((row) => row.wallet === wallet);
