@@ -22,6 +22,7 @@ export type Tool =
   | "hline"
   | "vline"
   | "rect"
+  | "fib"
   | "measure"
   | "long"
   | "short";
@@ -40,7 +41,7 @@ export interface Point {
  */
 export interface TwoPointDrawing {
   id: string;
-  kind: "trend" | "ray" | "rect" | "measure";
+  kind: "trend" | "ray" | "rect" | "fib" | "measure";
   a: Point;
   b: Point;
 }
@@ -181,7 +182,7 @@ export function hitTest(
     consider({ id: d.id, handle: "a" }, Math.hypot(px - xa, py - ya), 0);
     consider({ id: d.id, handle: "b" }, Math.hypot(px - xb, py - yb), 0);
 
-    if (d.kind === "rect") {
+    if (d.kind === "rect" || d.kind === "fib") {
       const left = Math.min(xa, xb), right = Math.max(xa, xb);
       const top = Math.min(ya, yb), bottom = Math.max(ya, yb);
       const edge = Math.min(
@@ -276,7 +277,11 @@ function parse(raw: unknown): Drawing[] {
       );
     }
     return (
-      (c.kind === "trend" || c.kind === "ray" || c.kind === "rect" || c.kind === "measure") &&
+      (c.kind === "trend" ||
+        c.kind === "ray" ||
+        c.kind === "rect" ||
+        c.kind === "fib" ||
+        c.kind === "measure") &&
       isPoint((d as TwoPointDrawing).b)
     );
   });

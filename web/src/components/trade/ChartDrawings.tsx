@@ -106,6 +106,16 @@ const TOOLS: { tool: Tool; label: string; key?: string; icon: React.ReactNode }[
     ),
   },
   {
+    tool: "fib",
+    label: "Fibonacci retracement — levels between a high and a low",
+    icon: (
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden>
+        <path d="M1.5 3h13M1.5 6.5h13M1.5 10h13M1.5 13.5h13" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M1.5 3L14.5 13.5" stroke="currentColor" strokeWidth="0.9" opacity="0.5" />
+      </svg>
+    ),
+  },
+  {
     tool: "measure",
     label: "Measure — price and time between two points",
     icon: (
@@ -173,6 +183,17 @@ const SELECTED = "#3D5CF5";
 const UP = "#2EBD85";
 const DOWN = "#E5484D";
 const MONO = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+
+/** The retracements a trader expects, and the colour each is usually drawn in. */
+const FIB_LEVELS: [number, string][] = [
+  [0, "#C9CDD8"],
+  [0.236, "#9FB0FF"],
+  [0.382, "#2EBD85"],
+  [0.5, "#F2A93B"],
+  [0.618, "#2EBD85"],
+  [0.786, "#9FB0FF"],
+  [1, "#C9CDD8"],
+];
 
 export function ChartDrawings({
   chart,
@@ -411,7 +432,7 @@ export function ChartDrawings({
         setTool("cursor");
         return { kind: "none" };
       }
-      if (t === "trend" || t === "ray" || t === "rect" || t === "measure") {
+      if (t === "trend" || t === "ray" || t === "rect" || t === "fib" || t === "measure") {
         return { kind: "new", d: { id, kind: t, a: at, b: at }, from: { x, y }, moved: false };
       }
       return null;
@@ -530,9 +551,15 @@ export function ChartDrawings({
 
       if (gesture.kind === "new") {
         if (gesture.moved) {
+          // Take the second point from where the button came up, not from the
+          // last move: they are the same for a real mouse, and this way a
+          // release that outruns the move stream still lands where it looks.
+          const end = "touches" in event ? null : locate(event as MouseEvent);
+          const finished =
+            end && "b" in gesture.d ? { ...gesture.d, b: end.at } : gesture.d;
           gestureRef.current = { kind: "none" };
-          commit([...drawingsRef.current, gesture.d]);
-          setSelected(gesture.d.id);
+          commit([...drawingsRef.current, finished]);
+          setSelected(finished.id);
           setTool("cursor");
         } else {
           // A click rather than a drag: wait for the second click.
@@ -783,10 +810,19 @@ function paintDrawing(
     const risk = ((d.a.price - d.stop) / d.a.price) * 100 * (d.dir === "long" ? 1 : -1);
     const rr = risk !== 0 ? Math.abs(reward / risk) : 0;
 
-    label(ctx, `${d.dir === "long" ? "Long" : "Short"} ${fmtPrice(d.a.price, dp)}`, left + 3, yEntry, isSelected ? SELECTED : "#C9CDD8");
+    const entryText = `${d.dir === "long" ? "Long" : "Short"} ${fmtPrice(d.a.price, dp)}`;
+    const rrText = `R:R ${rr.toFixed(2)}`;
+    const ink = isSelected ? SELECTED : "#C9CDD8";
+    label(ctx, entryText, left + 3, yEntry, ink);
     label(ctx, `Target ${fmtPrice(d.target, dp)}  ${fmtPct(reward)}`, left + 3, yTarget, UP);
     label(ctx, `Stop ${fmtPrice(d.stop, dp)}  ${fmtPct(-Math.abs(risk))}`, left + 3, yStop, DOWN);
-    label(ctx, `R:R ${rr.toFixed(2)}`, right - 3, yEntry, isSelected ? SELECTED : "#C9CDD8", "right");
+    // The risk/reward sits at the right edge of the box, unless the box is too
+    // narrow to hold both labels — then it goes just outside, rather than
+    // landing on top of the entry and clipping it.
+    ctx.font = MONO;
+    const room = ctx.measureText(entryText).width + ctx.measureText(rrText).width + 36;
+    if (right - left > room) label(ctx, rrText, right - 3, yEntry, ink, "right");
+    else label(ctx, rrText, right + 6, yEntry, ink);
 
     if (isSelected) {
       handleDot(ctx, left, yEntry);
@@ -802,6 +838,38 @@ function paintDrawing(
   const ya = proj.y(d.a.price);
   const yb = proj.y(d.b.price);
   if (xa === null || xb === null || ya === null || yb === null) return;
+
+  if (d.kind === "fib") {
+    // The retracement runs from the first point (0%) to the second (100%),
+    // which is why it is drawn from the price at `a` towards the price at `b`
+    // rather than from the top of the box down: dragging a high onto a low
+    // and dragging a low onto a high mean different things.
+    const left = Math.min(xa, xb);
+    const right = Math.max(xa, xb);
+    ctx.font = MONO;
+    for (const [level, colour] of FIB_LEVELS) {
+      const price = d.a.price + (d.b.price - d.a.price) * level;
+      const y = proj.y(price);
+      if (y === null) continue;
+      ctx.strokeStyle = isSelected ? SELECTED : colour;
+      ctx.lineWidth = level === 0 || level === 1 ? 1.4 : 1;
+      ctx.setLineDash(level === 0 || level === 1 ? [] : [4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = colour;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(`${(level * 100).toFixed(1)}%  ${fmtPrice(price, dp)}`, left + 4, y - 2);
+    }
+    if (isSelected) {
+      handleDot(ctx, xa, ya);
+      handleDot(ctx, xb, yb);
+    }
+    return;
+  }
 
   if (d.kind === "rect") {
     ctx.fillStyle = "rgba(61,92,245,0.10)";
