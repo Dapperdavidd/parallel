@@ -47,6 +47,7 @@ import { parseAsset, parseAssetOracleProfile } from "../vendor/percolator-v16/in
 import { getMarket } from "../lib/markets.js";
 import { shouldPush, type IndexTick } from "../lib/index-math.js";
 import { openStore, type Store } from "../lib/store/index.js";
+import { stayAlive, withDeadline } from "../lib/stay-alive.js";
 import { runOnce, rollAllCandles, TICK_INTERVAL_MS } from "./index-service.js";
 import { loadRegistry, type RegistryEntry } from "../lib/registry.js";
 
@@ -302,9 +303,19 @@ async function main(): Promise<void> {
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
 
+  // A keeper that exits is an index that stops, and a stopped index reads as
+  // "every market is paused" in the app. In a loop, nothing short of a signal
+  // may end this process.
+  if (loop) stayAlive("keeper");
+
+  // A pass has to finish before the next one is due. The sources are already
+  // individually bounded; this bounds everything else, including the case
+  // where the host suspends mid-pass and wakes with dead sockets.
+  const passDeadlineMs = Math.max(90_000, everyMs * 3);
+
   for (;;) {
     try {
-      await pass(conn, admin, store, registry);
+      await withDeadline(pass(conn, admin, store, registry), passDeadlineMs, "pass");
     } catch (err) {
       // A bad pass must not kill the keeper: the next one is two minutes away.
       console.error(`${RED}pass failed:${OFF} ${err instanceof Error ? err.message : err}`);
