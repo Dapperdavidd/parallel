@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createChart,
   ColorType,
@@ -12,6 +12,8 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { candlesFor, type Candle, type Market } from "@/lib/mock";
+import { ChartDrawings } from "@/components/trade/ChartDrawings";
+import { readScale } from "@/lib/chart-scale";
 
 /** What /api/candles returns. */
 interface ChartFeed {
@@ -46,10 +48,95 @@ const STEP_SECONDS: Record<Timeframe, number> = {
   "1M": 30 * 24 * 3600,
 };
 
+/* ----------------------------------------------------------- pan, zoom -- */
+
+/**
+ * Pan and zoom are ours rather than the library's.
+ *
+ * The library maps a wheel event to `barSpacing + deltaY/100 * barSpacing/10`.
+ * On a mouse that is a tolerable step; on a trackpad, where one swipe is fifty
+ * events of `deltaY ≈ 2`, it is a fifth of a percent at a time — the gesture
+ * reads as doing nothing at all, while the small sideways drift of the same
+ * swipe scrolls the chart. That is exactly the reported symptom: the candles
+ * sit still and the frame slides off to one side.
+ *
+ * So: zoom is exponential in the wheel delta, which makes it feel identical
+ * from a trackpad and from a notched wheel, and it is anchored on the pointer
+ * — the bar under the cursor does not move. One flick is about two and a half
+ * times in or out, and one wheel notch about a third.
+ */
+const ZOOM_GAIN = 320;
+/** A pinch (a wheel event with ctrl held) is a deliberate, finer gesture. */
+const PINCH_GAIN = 90;
+/** Nothing good comes of zooming past a handful of bars, or past the series. */
+const MIN_SPAN_BARS = 5;
+
+const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+
+/** The library's own floor; declared here because the arithmetic below needs it. */
+const MIN_BAR_SPACING = 0.5;
+
+/**
+ * One change of view: zoom by `factor` about `anchorX`, then slide by
+ * `panPx` pixels.
+ *
+ * Both are done by setting bar spacing and the right offset, which is how the
+ * library's own zoom works internally. Two details make the obvious
+ * alternatives wrong:
+ *
+ *  - Not `setVisibleLogicalRange`: a logical range addresses bar *centres*
+ *    while the range is measured at the pane edges, and that half-bar changes
+ *    with the zoom, so setting a range left the anchor drifting about thirty
+ *    pixels a notch.
+ *  - The right offset is corrected in closed form rather than by measuring,
+ *    because `applyOptions({ barSpacing })` is queued on an invalidation mask
+ *    and does not take effect until the next frame — reading the scale back
+ *    straight away returns the old one, and the correction came out as zero.
+ *    Inverting the library's index-to-coordinate line gives it exactly:
+ *    holding the index at `x` fixed through a change of spacing needs
+ *    `rightOffset += (width - 1 - x) * (1/s' - 1/s)`.
+ *
+ * Zoom and pan are applied together because each sets the right offset
+ * absolutely: done as two calls, the second would read a scale the first had
+ * only queued, and throw the first away.
+ */
+function transformView(
+  chart: IChartApi,
+  change: { factor?: number; panPx?: number; anchorX?: number | null; barCount: number },
+): void {
+  const ts = chart.timeScale();
+  const scale = readScale(ts);
+  if (!scale) return;
+
+  const factor = change.factor ?? 1;
+  const panPx = change.panPx ?? 0;
+  if (!Number.isFinite(factor) || factor <= 0) return;
+
+  const width = ts.width();
+  const s = scale.spacing;
+  // The library clamps the spacing to these bounds itself. Clamping here too
+  // keeps the offset correction in step with the spacing actually applied.
+  const next = clamp(s / factor, MIN_BAR_SPACING, Math.max(MIN_BAR_SPACING, width * 0.5));
+  // Zooming further out once the whole series is already a smudge is nothing
+  // but a way to lose the chart off the side of the pane.
+  const refusesZoomOut = next < s && change.barCount * next < width * 0.15;
+  const spacing = refusesZoomOut ? s : next;
+
+  const x = change.anchorX ?? width / 2;
+  let offset = ts.scrollPosition();
+  if (spacing !== s) offset += (width - 1 - x) * (1 / spacing - 1 / s);
+  // A bigger right offset pushes the last bar further left, which is what a
+  // positive `deltaX` — a swipe towards the future — should do.
+  if (panPx !== 0) offset += panPx / spacing;
+
+  if (spacing !== s) ts.applyOptions({ barSpacing: spacing });
+  ts.scrollToPosition(offset, false);
+}
+
 /**
  * The market chart: candles of the Parallel street index, with the official
- * rate as a dashed overlay so the premium is visible, plus markers for the
- * viewer's own entries (PRD F6).
+ * rate as a dashed overlay so the premium is visible, markers for the viewer's
+ * own entries (PRD F6), and a drawing layer for the tools a trader expects.
  *
  * Built on TradingView Lightweight Charts, styled to match the design
  * hand-off's palette.
@@ -67,6 +154,7 @@ export function PriceChart({
   /** Tells the caller what the chart is actually showing, so it can say so. */
   onSource?: (s: { mode: "index" | "official-candles" | "official" | "sample"; indexFrom: string | null }) => void;
 }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -74,6 +162,16 @@ export function PriceChart({
   /** The `market|timeframe` whose data the current viewport was fitted to. */
   const fittedRef = useRef<string>("");
   const markRef = useRef<IPriceLine | null>(null);
+  /** The wheel handler needs the bar count without re-binding on every pass. */
+  const barCountRef = useRef(0);
+
+  /** Published once the chart exists, so the drawing layer can attach to it. */
+  const [api, setApi] = useState<{
+    chart: IChartApi;
+    series: ISeriesApi<"Candlestick">;
+  } | null>(null);
+  /** Bar open times, for anchoring drawings between and beyond the bars. */
+  const [barTimes, setBarTimes] = useState<number[]>([]);
 
   // Create once.
   useEffect(() => {
@@ -103,7 +201,7 @@ export function PriceChart({
         timeVisible: true,
         secondsVisible: false,
         barSpacing: 9,
-        minBarSpacing: 0.8,
+        minBarSpacing: 0.5,
         rightOffset: 4,
         // Resizing the panel should move the frame, not re-fit the data and
         // throw away wherever the viewer had scrolled to.
@@ -114,18 +212,17 @@ export function PriceChart({
         vertLine: { color: "#3D5CF5", labelBackgroundColor: "#3D5CF5" },
         horzLine: { color: "#3D5CF5", labelBackgroundColor: "#3D5CF5" },
       },
-      // Pan and zoom spelled out rather than left to the defaults, so wheel,
-      // drag, pinch and axis-drag all work the way they do on a desktop
-      // charting tool. `minBarSpacing` is what decides how far in you can go:
-      // the default stops you well before the candles get large.
+      // Drag to pan, drag an axis to rescale it, pinch to zoom on a phone.
+      // The wheel is handled below instead of here, because the library's own
+      // mapping is unusable on a trackpad.
       handleScroll: {
-        mouseWheel: true,
+        mouseWheel: false,
         pressedMouseMove: true,
         horzTouchDrag: true,
         vertTouchDrag: false,
       },
       handleScale: {
-        mouseWheel: true,
+        mouseWheel: false,
         pinch: true,
         axisPressedMouseMove: { time: true, price: true },
         axisDoubleClickReset: { time: true, price: true },
@@ -134,7 +231,7 @@ export function PriceChart({
       autoSize: true,
     });
 
-    candleRef.current = chart.addCandlestickSeries({
+    const series = chart.addCandlestickSeries({
       upColor: "#2EBD85",
       downColor: "#E5484D",
       borderUpColor: "#2EBD85",
@@ -146,6 +243,7 @@ export function PriceChart({
       lastValueVisible: false,
       priceLineVisible: false,
     });
+    candleRef.current = series;
 
     officialRef.current = chart.addLineSeries({
       color: "#8A8A90",
@@ -157,6 +255,57 @@ export function PriceChart({
     });
 
     chartRef.current = chart;
+    setApi({ chart, series });
+
+    // Wheel: vertical zooms on the pointer, horizontal pans, shift pans,
+    // ctrl (which is what a trackpad pinch sends) zooms finer.
+    //
+    // A trackpad delivers several wheel events per frame, so they are
+    // accumulated and applied once a frame. Applying each one as it arrives
+    // looked right and was not: the view change is queued until the next
+    // frame, so every event in a burst computed from the same unchanged scale
+    // and the last one simply overwrote the rest. A flick of twenty events
+    // zoomed 1.3% instead of 28%, which is precisely the gesture that felt
+    // like it was doing nothing.
+    let pendingFactor = 1;
+    let pendingPanPx = 0;
+    let anchorX = 0;
+    let scheduled = 0;
+    const flush = (): void => {
+      scheduled = 0;
+      const factor = pendingFactor;
+      const panPx = pendingPanPx;
+      pendingFactor = 1;
+      pendingPanPx = 0;
+      if (factor === 1 && panPx === 0) return;
+      transformView(chart, { factor, panPx, anchorX, barCount: barCountRef.current });
+    };
+    const schedule = (): void => {
+      if (scheduled === 0) scheduled = window.requestAnimationFrame(flush);
+    };
+
+    const onWheel = (event: WheelEvent): void => {
+      const unit = event.deltaMode === 1 ? 32 : event.deltaMode === 2 ? 120 : 1;
+      const dy = event.deltaY * unit;
+      const dx = event.deltaX * unit;
+      if (dy === 0 && dx === 0) return;
+      event.preventDefault();
+
+      const rect = host.getBoundingClientRect();
+      anchorX = event.clientX - rect.left;
+
+      if (event.ctrlKey || event.metaKey) {
+        pendingFactor *= Math.exp(clamp(dy, -60, 60) / PINCH_GAIN);
+      } else if (event.shiftKey) {
+        pendingPanPx += dy;
+      } else if (Math.abs(dx) > Math.abs(dy)) {
+        pendingPanPx += dx;
+      } else {
+        pendingFactor *= Math.exp(clamp(dy, -140, 140) / ZOOM_GAIN);
+      }
+      schedule();
+    };
+    host.addEventListener("wheel", onWheel, { passive: false });
 
     // Double-click anywhere on the chart frames the whole series again. The
     // library only does this on the axes, and once zoom survives a refresh the
@@ -165,12 +314,15 @@ export function PriceChart({
     host.addEventListener("dblclick", reset);
 
     return () => {
+      if (scheduled !== 0) window.cancelAnimationFrame(scheduled);
+      host.removeEventListener("wheel", onWheel);
       host.removeEventListener("dblclick", reset);
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
       officialRef.current = null;
       markRef.current = null;
+      setApi(null);
     };
   }, []);
 
@@ -262,6 +414,19 @@ export function PriceChart({
         close: c.close,
       })),
     );
+    barCountRef.current = data.length;
+    // The drawing layer anchors on time, and needs the bar times to place a
+    // point that falls between bars or beyond the last one. Replace the array
+    // only when it has actually changed, or the layer re-renders on every poll.
+    const times = data.map((c) => c.time as number);
+    setBarTimes((prev) =>
+      prev.length === times.length &&
+      prev[0] === times[0] &&
+      prev[prev.length - 1] === times[times.length - 1]
+        ? prev
+        : times,
+    );
+
     // The dashed line is either the official-rate history (pre-launch) or the
     // current official rate drawn flat across the measured span.
     if (mode === "official-candles") {
@@ -319,24 +484,62 @@ export function PriceChart({
         }),
     );
 
-    // Fit the frame only when the dataset itself changes — a new market or a
-    // new timeframe. The live price poll hands back a fresh `market` object
-    // every 30 seconds, and fitting on that was silently undoing the viewer's
-    // zoom and scroll twice a minute, which is why the chart felt like it
-    // fought back. Double-click resets it deliberately instead.
-    const key = `${market.c}|${timeframe}`;
+    // Fit the frame only when the dataset itself changes — a new market, a new
+    // timeframe, or a change of what is being drawn. The live price poll hands
+    // back a fresh `market` object every 30 seconds, and fitting on that was
+    // silently undoing the viewer's zoom and scroll twice a minute, which is
+    // why the chart felt like it fought back. Double-click resets it
+    // deliberately instead.
+    //
+    // `mode` belongs in the key: the first pass draws the sample series while
+    // the feed is still in flight, and keying on market and timeframe alone
+    // meant the frame stayed fitted to the sample — the real candles then
+    // landed in a corner of an empty pane at the default bar spacing.
+    const key = `${market.c}|${timeframe}|${mode}`;
     if (fittedRef.current !== key) {
       chart.timeScale().fitContent();
       fittedRef.current = key;
     }
   }, [market, timeframe, trades, feed, onSource]);
 
+  const zoom = useCallback((factor: number) => {
+    const chart = chartRef.current;
+    if (chart) transformView(chart, { factor, barCount: barCountRef.current });
+  }, []);
+  const fit = useCallback(() => chartRef.current?.timeScale().fitContent(), []);
+
   return (
-    <div
-      ref={hostRef}
-      className="chart-host"
-      role="img"
-      aria-label={`USD/${market.c} price chart`}
-    />
+    <div className="chart-wrap" ref={wrapRef}>
+      <div
+        ref={hostRef}
+        className="chart-host"
+        role="img"
+        aria-label={`USD/${market.c} price chart`}
+      />
+
+      {api && (
+        <ChartDrawings
+          chart={api.chart}
+          series={api.series}
+          wrap={wrapRef}
+          host={hostRef}
+          barTimes={barTimes}
+          code={market.c}
+          dp={market.dp}
+        />
+      )}
+
+      <div className="chart-zoom">
+        <button type="button" onClick={() => zoom(1 / 1.35)} title="Zoom in" aria-label="Zoom in">
+          +
+        </button>
+        <button type="button" onClick={() => zoom(1.35)} title="Zoom out" aria-label="Zoom out">
+          −
+        </button>
+        <button type="button" onClick={fit} title="Fit the whole series (or double-click the chart)" aria-label="Fit">
+          ⤢
+        </button>
+      </div>
+    </div>
   );
 }

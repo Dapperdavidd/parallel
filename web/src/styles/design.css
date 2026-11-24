@@ -268,6 +268,41 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
    fixed 420px that leaves dead space under the positions table. */
 .chart-host{flex:1 1 auto;min-height:320px;width:100%}
 
+/* The chart frame. The canvas the library draws on, the drawing layer above
+   it, the tool strip and the zoom controls all stack in here, so the drawing
+   layer can sit exactly over the plot area. */
+.chart-wrap{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:320px;
+  min-width:0;width:100%}
+.chart-wrap .chart-host{min-height:0}
+/* Never takes a pointer event: the gesture is claimed on the wrapper, and only
+   when the drawing layer actually wants it. */
+.chart-draw{position:absolute;inset:0;z-index:2;pointer-events:none}
+
+.chart-tools{position:absolute;left:8px;top:8px;z-index:3;display:flex;flex-direction:column;gap:2px;
+  padding:4px;border-radius:10px;background:#0E0E11E8;border:1px solid var(--ln2);
+  box-shadow:0 10px 26px #0009}
+.chart-tools button{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:7px;color:var(--ink3)}
+.chart-tools button:hover{background:#ffffff0f;color:var(--ink)}
+.chart-tools button.on{background:#3D5CF526;color:var(--pri-t)}
+.chart-tools button:disabled{opacity:.3;cursor:default}
+.chart-tools-sep{height:1px;margin:3px 2px;background:var(--ln2)}
+
+.chart-zoom{position:absolute;right:70px;bottom:36px;z-index:3;display:flex;gap:2px;padding:3px;
+  border-radius:9px;background:#0E0E11D9;border:1px solid var(--ln2)}
+.chart-zoom button{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  width:24px;height:22px;border-radius:6px;color:var(--ink3);font-size:13px;line-height:1}
+.chart-zoom button:hover{background:#ffffff0f;color:var(--ink)}
+
+@media (max-width:860px){
+  /* A column of eleven tools is taller than the chart on a phone; across the
+     top, scrolling sideways, it stays out of the candles. */
+  .chart-tools{flex-direction:row;left:6px;right:6px;top:6px;gap:1px;overflow-x:auto;
+    scrollbar-width:none}
+  .chart-tools::-webkit-scrollbar{display:none}
+  .chart-zoom{right:58px;bottom:30px}
+}
+
 /* The footer link columns were `repeat(3,minmax(130px,1fr))` with 48px gaps,
    which is a hard 486px floor — wider than a phone, so the whole document
    scrolled sideways and clipped the nav and hero copy. (Bug inherited from the
@@ -565,7 +600,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 /* Body: chart | trades | ticket */
 .tbody{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 260px 300px;min-height:0}
 .tchart{display:flex;flex-direction:column;min-width:0;min-height:0}
-.tchart .chart-host{flex:1 1 auto;min-height:260px}
+.tchart .chart-wrap{flex:1 1 auto;min-height:260px}
 
 /* Live trades feed */
 .feed{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--ln)}
