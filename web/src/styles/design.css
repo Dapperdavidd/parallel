@@ -616,11 +616,17 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
   border-top:1px solid var(--ln)}
 
 /* Docked bottom panel */
-.bpanel{border-top:1px solid var(--ln);display:flex;flex-direction:column;min-height:170px;max-height:38%}
+.bpanel{border-top:1px solid var(--ln);display:flex;flex-direction:column;min-height:170px;max-height:38%;min-width:0}
 .bpanel-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--ln)}
 .bpanel-tabs button{border:none;background:none;padding:10px 12px;font-size:13px;color:var(--ink3)}
 .bpanel-tabs button.on{color:var(--ink);box-shadow:inset 0 -2px 0 var(--pri)}
-.bpanel-body{flex:1;overflow:auto;min-height:0}
+/* `min-width:0` matters as much as `min-height`: in a column flex container an
+   item's automatic minimum size is its *content* width, and the positions
+   table declares `min-width:720px`. Without this the panel is 720px wide
+   inside a 390px phone, and the whole trade screen scrolls sideways — which is
+   what made the header read as rubble, since the picker and the stats strip
+   were being stretched to a parent twice the width of the screen. */
+.bpanel-body{flex:1;overflow:auto;min-height:0;min-width:0}
 .bpanel-empty{margin:0;padding:18px 16px;font-size:13px;color:var(--ink3)}
 
 /* Top-bar icon buttons and popovers */
@@ -660,6 +666,26 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 
 @media (max-width:1180px){.tbody{grid-template-columns:minmax(0,1fr) 290px}.feed{display:none}}
 @media (max-width:860px){.tbody{display:block}.tchart{min-height:70vh}.ticket{border-top:1px solid var(--ln)}}
+
+/* The stats strip on a phone.
+   Ten stats in a wrapping flex row break into a ragged block of orphaned
+   labels — the market picker ends up beside one of them and the whole header
+   reads as rubble. A single row that scrolls sideways is what every exchange
+   on a phone does, and it keeps the mark and the 24h change where the eye
+   lands first. The 24h range widget is a slider that needs width to mean
+   anything, so it is not in the strip. */
+@media (max-width:860px){
+  /* `nowrap` is not decoration: the base rule wraps, and a wrapping *column*
+     flex container sizes its columns to their content instead of stretching
+     them, so the stats strip was 718px wide inside a 390px screen and took
+     the market picker and the tab bar out with it. */
+  .thead{flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:12px;padding:10px 12px}
+  .hstats{flex-wrap:nowrap;overflow-x:auto;gap:20px;padding-bottom:2px;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .hstats::-webkit-scrollbar{display:none}
+  .hstat{flex:0 0 auto}
+  .hstats .hrange{display:none}
+}
 
 /* ================= hero reveal + bare top panel ================= */
 /* No banner any more; the panel is just the nav. Over the hero it is bare —
