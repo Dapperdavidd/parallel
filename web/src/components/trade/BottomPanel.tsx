@@ -7,7 +7,7 @@ import { useDemo } from "@/lib/store";
 import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import { PositionsTable } from "./PositionsTable";
 
-const TABS = ["Positions", "Balances", "Trade history", "Funding"] as const;
+const TABS = ["Positions", "Open orders", "Trade history", "Balances", "Funding"] as const;
 type Tab = (typeof TABS)[number];
 
 interface StoredTrade {
@@ -57,6 +57,17 @@ export function BottomPanel({ market }: { market: Market }) {
 
       <div className="bpanel-body">
         {tab === "Positions" && <PositionsTable />}
+
+        {tab === "Open orders" && (
+          <div className="bpanel-empty orders-empty">
+            <b>No resting orders</b>
+            <span>
+              Parallel currently supports immediate market execution against an isolated vault.
+              Limit, trigger, TP/SL, and reduce-only orders are not enabled by this deployed
+              devnet program, so nothing is hidden here.
+            </span>
+          </div>
+        )}
 
         {tab === "Balances" && (
           <table className="postable">

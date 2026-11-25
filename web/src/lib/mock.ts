@@ -43,6 +43,9 @@ export interface Market {
   /** How many units of local currency make one tradable contract. */
   unitSize: number;
   unitLabel: string;
+  /** Live server policy; absent only while the market API has not loaded. */
+  maxNotionalUsdc?: number;
+  maxOpenInterestUsdc?: number;
 }
 
 /** Measured live on 2026-11-20 by `npm run spike5`. */

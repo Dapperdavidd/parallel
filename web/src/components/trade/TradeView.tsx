@@ -6,7 +6,12 @@ import { byCode } from "@/lib/mock";
 import { useMarket } from "@/lib/live";
 import { useDemo } from "@/lib/store";
 import { useChainPortfolio } from "@/lib/useChainPortfolio";
-import { PriceChart, TIMEFRAMES, type Timeframe } from "@/components/PriceChart";
+import {
+  PriceChart,
+  TIMEFRAMES,
+  type ChartIndicators,
+  type Timeframe,
+} from "@/components/PriceChart";
 import { MarketSelect } from "./MarketSelect";
 import { MarketStats } from "./MarketStats";
 import { TradesFeed } from "./TradesFeed";
@@ -29,6 +34,7 @@ export function TradeView() {
   const { market: stateMarket, setMarket } = useDemo();
   const { trades } = useChainPortfolio();
   const [tf, setTf] = useState<Timeframe>("1H");
+  const [indicators, setIndicators] = useState<ChartIndicators>({ ma20: true, ema50: false });
 
   const requested = params.get("m");
   useEffect(() => {
@@ -86,7 +92,24 @@ export function TradeView() {
                 {x}
               </button>
             ))}
-            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink3)", paddingRight: 4 }}>
+            <i className="tf-sep" aria-hidden />
+            <button
+              type="button"
+              className={indicators.ma20 ? "indicator on" : "indicator"}
+              onClick={() => setIndicators((value) => ({ ...value, ma20: !value.ma20 }))}
+              title="20-period simple moving average of the series on screen"
+            >
+              <span className="ind-dot ma" /> MA 20
+            </button>
+            <button
+              type="button"
+              className={indicators.ema50 ? "indicator on" : "indicator"}
+              onClick={() => setIndicators((value) => ({ ...value, ema50: !value.ema50 }))}
+              title="50-period exponential moving average of the series on screen"
+            >
+              <span className="ind-dot ema" /> EMA 50
+            </button>
+            <span className="chart-caption">
               {caption}
             </span>
           </div>
@@ -94,6 +117,7 @@ export function TradeView() {
           <PriceChart
             market={m}
             timeframe={tf}
+            indicators={indicators}
             trades={(trades ?? []).filter((t) => t.marketId === `USD/${m.c}`)}
             onSource={onSource}
           />

@@ -39,6 +39,10 @@ const MIN_REAL_CANDLES = 8;
 /** PRD F6 asks for five timeframes. */
 export const TIMEFRAMES = ["1H", "4H", "1D", "1W", "1M"] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
+export interface ChartIndicators {
+  ma20: boolean;
+  ema50: boolean;
+}
 
 const STEP_SECONDS: Record<Timeframe, number> = {
   "1H": 3600,
@@ -75,6 +79,24 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 
 /** The library's own floor; declared here because the arithmetic below needs it. */
 const MIN_BAR_SPACING = 0.5;
+
+const simpleMovingAverage = (data: Candle[], period: number) =>
+  data.flatMap((point, index) => {
+    if (index + 1 < period) return [];
+    const window = data.slice(index + 1 - period, index + 1);
+    const value = window.reduce((sum, item) => sum + item.close, 0) / period;
+    return [{ time: point.time as UTCTimestamp, value }];
+  });
+
+const exponentialMovingAverage = (data: Candle[], period: number) => {
+  if (data.length === 0) return [];
+  const alpha = 2 / (period + 1);
+  let value = data[0]!.close;
+  return data.map((point) => {
+    value = point.close * alpha + value * (1 - alpha);
+    return { time: point.time as UTCTimestamp, value };
+  });
+};
 
 /**
  * One change of view: zoom by `factor` about `anchorX`, then slide by
@@ -145,12 +167,14 @@ export function PriceChart({
   market,
   timeframe,
   trades,
+  indicators,
   onSource,
 }: {
   market: Market;
   timeframe: Timeframe;
   /** The viewer's confirmed trades in this market. */
   trades: { ts: string; side: "long" | "short"; action: string }[];
+  indicators: ChartIndicators;
   /** Tells the caller what the chart is actually showing, so it can say so. */
   onSource?: (s: { mode: "index" | "official-candles" | "official" | "sample"; indexFrom: string | null }) => void;
 }) {
@@ -159,6 +183,8 @@ export function PriceChart({
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const officialRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema50Ref = useRef<ISeriesApi<"Line"> | null>(null);
   /** The `market|timeframe` whose data the current viewport was fitted to. */
   const fittedRef = useRef<string>("");
   const markRef = useRef<IPriceLine | null>(null);
@@ -254,6 +280,21 @@ export function PriceChart({
       crosshairMarkerVisible: false,
     });
 
+    ma20Ref.current = chart.addLineSeries({
+      color: "#F2A93B",
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    ema50Ref.current = chart.addLineSeries({
+      color: "#9FB0FF",
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
     chartRef.current = chart;
     setApi({ chart, series });
 
@@ -321,6 +362,8 @@ export function PriceChart({
       chartRef.current = null;
       candleRef.current = null;
       officialRef.current = null;
+      ma20Ref.current = null;
+      ema50Ref.current = null;
       markRef.current = null;
       setApi(null);
     };
@@ -353,8 +396,10 @@ export function PriceChart({
   useEffect(() => {
     const candles = candleRef.current;
     const official = officialRef.current;
+    const ma20 = ma20Ref.current;
+    const ema50 = ema50Ref.current;
     const chart = chartRef.current;
-    if (!candles || !official || !chart) return;
+    if (!candles || !official || !ma20 || !ema50 || !chart) return;
 
     const real = feed?.candles ?? [];
     const officialPts = feed?.officialHistory ?? [];
@@ -414,6 +459,8 @@ export function PriceChart({
         close: c.close,
       })),
     );
+    ma20.setData(indicators.ma20 ? simpleMovingAverage(data, 20) : []);
+    ema50.setData(indicators.ema50 ? exponentialMovingAverage(data, 50) : []);
     barCountRef.current = data.length;
     // The drawing layer anchors on time, and needs the bar times to place a
     // point that falls between bars or beyond the last one. Replace the array
@@ -500,7 +547,7 @@ export function PriceChart({
       chart.timeScale().fitContent();
       fittedRef.current = key;
     }
-  }, [market, timeframe, trades, feed, onSource]);
+  }, [market, timeframe, trades, feed, indicators, onSource]);
 
   const zoom = useCallback((factor: number) => {
     const chart = chartRef.current;

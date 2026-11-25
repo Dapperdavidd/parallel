@@ -47,6 +47,8 @@ export interface LiveMarket {
   lastPushTx: string | null;
   marketAccount: string;
   collateralVault: string;
+  maxNotionalUsdc: number | null;
+  maxOpenInterestUsdc: number | null;
 }
 
 interface LiveState {
@@ -154,6 +156,8 @@ export function useMarket(
       live: l.median !== null,
       paused: !l.acceptingPositions,
       reason: l.reason,
+      maxNotionalUsdc: l.maxNotionalUsdc ?? undefined,
+      maxOpenInterestUsdc: l.maxOpenInterestUsdc ?? undefined,
     };
   }, [byCode, code]);
 }
@@ -174,6 +178,8 @@ export function useMarkets(): (Market & { live: boolean; paused: boolean })[] {
           src: l.sources.length > 0 ? l.sources : base.src,
           live: l.median !== null,
           paused: !l.acceptingPositions,
+          maxNotionalUsdc: l.maxNotionalUsdc ?? undefined,
+          maxOpenInterestUsdc: l.maxOpenInterestUsdc ?? undefined,
         };
       }),
     [byCode],

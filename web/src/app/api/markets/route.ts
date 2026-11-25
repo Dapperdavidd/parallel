@@ -36,6 +36,8 @@ export interface LiveMarket {
   lastPushTx: string | null;
   marketAccount: string;
   collateralVault: string;
+  maxNotionalUsdc: number | null;
+  maxOpenInterestUsdc: number | null;
 }
 
 /**
@@ -89,6 +91,8 @@ export async function GET(): Promise<NextResponse> {
       lastPushTx: t?.pushedTx ?? null,
       marketAccount: m.market,
       collateralVault: m.vault,
+      maxNotionalUsdc: m.liquidityVault?.maxNotionalUsdc ?? null,
+      maxOpenInterestUsdc: m.liquidityVault?.maxOpenInterestUsdc ?? null,
     };
   });
 
