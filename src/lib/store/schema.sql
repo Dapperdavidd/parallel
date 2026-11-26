@@ -156,3 +156,24 @@ end $$;
 
 -- `users` and `hedges` hold a person's own activity: no anon read policy, so
 -- they are reachable only through the service role.
+
+-- ---------------------------------------------------------- faucet_claims --
+-- The devnet faucet's durable cooldown.
+--
+-- Rate limiting in process memory stops a loop, but not somebody patient, and
+-- it resets on every deploy. One row per wallet, written after a successful
+-- top-up, is what makes "once every few hours" true across restarts and
+-- across instances.
+--
+-- Deliberately no IP column: the per-address cooldown is what the faucet
+-- needs, and an address log would be personal data we have no use for.
+create table if not exists faucet_claims (
+  wallet        text primary key,
+  claims        integer not null default 0,
+  last_claim_at timestamptz not null default now()
+);
+
+alter table faucet_claims enable row level security;
+grant all privileges on faucet_claims to service_role;
+-- No anon grant and no read policy: who funded a wallet and when is nobody
+-- else's business, and the server is the only reader.

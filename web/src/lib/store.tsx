@@ -15,10 +15,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { useWallets } from "@privy-io/react-auth/solana";
+import { useSignMessage, useWallets } from "@privy-io/react-auth/solana";
 interface DemoState {
   signedIn: boolean;
   user: string;
@@ -44,9 +45,17 @@ interface Store extends DemoState {
 const Ctx = createContext<Store | null>(null);
 const KEY = "parallel.demo";
 
+/** Base64 without pulling a Node Buffer shim into the browser bundle. */
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 export function DemoProvider({ children }: { children: React.ReactNode }) {
   const { ready: authReady, authenticated, login, logout, user: privyUser } = usePrivy();
   const { wallets } = useWallets();
+  const { signMessage } = useSignMessage();
   const [s, setS] = useState<DemoState>(INITIAL);
   const [hydrated, setHydrated] = useState(false);
   const walletAddress = wallets[0]?.address ?? "";
@@ -80,22 +89,62 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     setS(() => ({ ...INITIAL }));
   }, [logout]);
 
+  /**
+   * Prove the wallet is ours, then ask the faucet.
+   *
+   * The faucet mints, so it will not fund an address on a browser's word
+   * alone — see `lib/server/wallet-proof.ts`. The server issues a challenge,
+   * the wallet signs it, and the signature travels with the request. The
+   * embedded wallet signs without a dialog (`lib/privy.tsx`), so a person
+   * signing in sees funds arrive rather than a prompt they did not ask for.
+   */
   const fundWallet = useCallback(async (): Promise<number> => {
-    if (!walletAddress) return 0;
+    const wallet = wallets[0];
+    if (!wallet || !walletAddress) return 0;
+
+    const challenged = await fetch("/api/auth/challenge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wallet: walletAddress, purpose: "faucet" }),
+    });
+    const challenge = (await challenged.json()) as {
+      message?: string;
+      token?: string;
+      error?: string;
+    };
+    if (!challenged.ok || !challenge.message || !challenge.token) {
+      throw new Error(challenge.error ?? "Could not start the devnet top-up");
+    }
+
+    const { signature } = await signMessage({
+      message: new TextEncoder().encode(challenge.message),
+      wallet,
+    });
+
     const response = await fetch("/api/faucet", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ wallet: walletAddress }),
+      body: JSON.stringify({
+        wallet: walletAddress,
+        proof: challenge.token,
+        signature: toBase64(signature),
+      }),
     });
     const body = (await response.json()) as { balance?: number; added?: number; error?: string };
     if (!response.ok || body.balance === undefined) {
       throw new Error(body.error ?? "Devnet funding failed");
     }
     return body.added ?? 0;
-  }, [walletAddress]);
+  }, [wallets, walletAddress, signMessage]);
 
+  // One automatic top-up per wallet per session. Without the guard, a
+  // re-render that changes the wallet array identity would ask again, and the
+  // faucet's cooldown would start refusing a person who had done nothing.
+  const fundedRef = useRef<string>("");
   useEffect(() => {
     if (!authReady || !authenticated || !walletAddress) return;
+    if (fundedRef.current === walletAddress) return;
+    fundedRef.current = walletAddress;
     void fundWallet().catch(() => undefined);
   }, [authReady, authenticated, walletAddress, fundWallet]);
 

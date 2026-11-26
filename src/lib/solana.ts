@@ -11,7 +11,6 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  SystemProgram,
   Transaction,
   TransactionInstruction,
   sendAndConfirmTransaction,

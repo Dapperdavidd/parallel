@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
 import { vaultSnapshot } from "@/lib/server/vaults";
+import { CEILINGS, route } from "@/lib/server/request";
+import { ok } from "@/lib/server/respond";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -12,9 +14,9 @@ export const revalidate = 0;
  * so the terminal can show the capital and caps that actually stand behind a
  * market.
  */
-export async function GET(): Promise<NextResponse> {
-  const snapshot = await vaultSnapshot();
-  return NextResponse.json(snapshot, {
-    headers: { "Cache-Control": "no-store" },
-  });
-}
+export const GET = route("vaults", { ceiling: CEILINGS.read, sameOrigin: false }, async () =>
+  ok(await vaultSnapshot(), {
+    // A vault's capital changes with every trade, but not every second.
+    "Cache-Control": "public, max-age=5, stale-while-revalidate=25",
+  }),
+);

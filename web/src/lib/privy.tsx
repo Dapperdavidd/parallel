@@ -18,7 +18,7 @@ class WalletErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }
 > {
-  state: { error: Error | null } = { error: null };
+  override state: { error: Error | null } = { error: null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
@@ -54,7 +54,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         appId={APP_ID}
         config={{
           loginMethods: ["email"],
-          embeddedWallets: { solana: { createOnLogin: "users-without-wallets" } },
+          embeddedWallets: {
+            solana: { createOnLogin: "users-without-wallets" },
+            // Headless signing for the embedded wallet.
+            //
+            // Parallel asks the wallet to sign three things: a trade, a close,
+            // and a short ownership challenge before the faucet will fund it.
+            // With the confirmation modal on, every one of those is a dialog
+            // the person must dismiss — including the one that fires
+            // automatically on first sign-in, which reads as the app breaking
+            // rather than as a security step. The embedded wallet is created
+            // by and for this app on devnet, so the app is the right place for
+            // the confirmation, and the ticket shows it before anything is
+            // sent. An external wallet still shows its own prompt, which is
+            // correct: that key is not ours.
+            showWalletUIs: false,
+          },
           solana: {
             rpcs: {
               "solana:devnet": {

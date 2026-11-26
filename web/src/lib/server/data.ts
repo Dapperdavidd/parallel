@@ -1,9 +1,11 @@
 import "server-only";
 
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { EnvironmentError, isProduction } from "./env";
+import { warn } from "./log";
 
 /**
  * Read-only access to what the index service and keeper produce.
@@ -14,9 +16,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * the read half of that contract.
  *
  * Two backends, same shape:
- *   - Supabase, when SUPABASE_URL and SUPABASE_ANON_KEY are set;
+ *   - Supabase, when SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set;
  *   - otherwise the JSON files the local store driver writes, so the whole app
  *     runs against real prices on one machine with no credentials at all.
+ *
+ * The second is a *development* backend, not a fallback: in production the
+ * database is required and its absence fails the request loudly.
  *
  * Everything here is `server-only`: a route handler or server component may
  * import it, a client component may not.
@@ -96,8 +101,27 @@ let supabase: SupabaseClient | null | undefined;
 function db(): SupabaseClient | null {
   if (supabase !== undefined) return supabase;
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
-  supabase = url && key ? createClient(url, key, { auth: { persistSession: false } }) : null;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    // The files are the *other* backend, for a machine with no credentials —
+    // not a fallback a deployment may land in. A production server reading
+    // `data/` would serve whatever history happened to be in the image,
+    // indefinitely, and look healthy doing it.
+    if (isProduction()) {
+      throw new EnvironmentError(
+        "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required in production",
+      );
+    }
+    if (url && process.env.SUPABASE_ANON_KEY) {
+      warn({
+        event: "store_anon_key_ignored",
+        detail: "the anon key cannot write or read hedges; falling back to the local files",
+      });
+    }
+    supabase = null;
+    return supabase;
+  }
+  supabase = createClient(url, key, { auth: { persistSession: false } });
   return supabase;
 }
 
@@ -149,8 +173,6 @@ const readLines = async <T>(path: string): Promise<T[]> => {
 };
 
 const tickFile = (id: string): string => join(DATA_DIR, "ticks", `${id.replace("/", "-")}.jsonl`);
-const officialFile = (id: string): string =>
-  join(DATA_DIR, "official", `${id.replace("/", "-")}.json`);
 const candleFile = (id: string): string => join(DATA_DIR, "candles", `${id.replace("/", "-")}.json`);
 
 // ------------------------------------------------------------------ markets --
@@ -493,4 +515,121 @@ export async function officialHistory(marketId: string, limit = 1200): Promise<O
   return rows
     .slice(Math.max(0, rows.length - limit))
     .map(([date, rate]) => ({ date, rate }));
+}
+
+// --------------------------------------------------------- faucet claims --
+
+/**
+ * When a wallet last took devnet funds.
+ *
+ * The in-memory rate limiter guards against a loop; this guards against the
+ * patient version of the same thing. It is the only faucet control that
+ * survives a restart or a second instance, which is why the cooldown lives
+ * here rather than in `rate-limit.ts`.
+ */
+export interface FaucetClaim {
+  wallet: string;
+  claims: number;
+  lastClaimAt: string;
+}
+
+const claimsFile = (): string => join(DATA_DIR, "faucet-claims.json");
+
+export async function faucetClaim(wallet: string): Promise<FaucetClaim | null> {
+  const client = db();
+  if (client) {
+    const { data, error } = await client
+      .from("faucet_claims")
+      .select("wallet, claims, last_claim_at")
+      .eq("wallet", wallet)
+      .maybeSingle();
+    if (error) throw new Error(`supabase read faucet claim: ${error.message}`);
+    if (!data) return null;
+    return { wallet: data.wallet, claims: data.claims, lastClaimAt: data.last_claim_at };
+  }
+  const all = await readJson<Record<string, FaucetClaim>>(claimsFile(), {});
+  return all[wallet] ?? null;
+}
+
+let claimWrite: Promise<void> = Promise.resolve();
+
+async function recordFaucetClaimUnlocked(wallet: string): Promise<void> {
+  const client = db();
+  const now = new Date().toISOString();
+  if (client) {
+    const existing = await faucetClaim(wallet);
+    const { error } = await client.from("faucet_claims").upsert(
+      { wallet, claims: (existing?.claims ?? 0) + 1, last_claim_at: now },
+      { onConflict: "wallet" },
+    );
+    if (error) throw new Error(`supabase write faucet claim: ${error.message}`);
+    return;
+  }
+  const path = claimsFile();
+  const all = await readJson<Record<string, FaucetClaim>>(path, {});
+  all[wallet] = { wallet, claims: (all[wallet]?.claims ?? 0) + 1, lastClaimAt: now };
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(path, `${JSON.stringify(all, null, 2)}\n`, "utf8");
+}
+
+/** Serialised, so two concurrent claims cannot both read a count of zero. */
+export function recordFaucetClaim(wallet: string): Promise<void> {
+  const write = () => recordFaucetClaimUnlocked(wallet);
+  claimWrite = claimWrite.then(write, write);
+  return claimWrite;
+}
+
+// ------------------------------------------------- twenty-four hour change --
+
+/**
+ * What the price was a day ago, and whether there is a day of history at all.
+ *
+ * The market board used to answer this by reading nine hundred ticks for each
+ * of thirteen markets on every request — about twelve thousand rows to compute
+ * thirteen percentages. These are two indexed lookups per market instead: the
+ * first tick at or after the cutoff, and whether anything exists before it.
+ *
+ * `hasFullDay` is the honest part. A market that launched an hour ago has no
+ * 24-hour change, and "0.00%" would be a number we invented.
+ */
+export interface DayReference {
+  reference: number | null;
+  hasFullDay: boolean;
+}
+
+export async function dayChangeReference(marketId: string): Promise<DayReference> {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const client = db();
+  if (client) {
+    const [after, before] = await Promise.all([
+      client
+        .from("index_ticks")
+        .select("median")
+        .eq("market_id", marketId)
+        .gte("ts", cutoff)
+        .not("median", "is", null)
+        .order("ts", { ascending: true })
+        .limit(1),
+      client
+        .from("index_ticks")
+        .select("ts")
+        .eq("market_id", marketId)
+        .lt("ts", cutoff)
+        .limit(1),
+    ]);
+    if (after.error) throw new Error(`supabase read day change: ${after.error.message}`);
+    if (before.error) throw new Error(`supabase read day change: ${before.error.message}`);
+    return {
+      reference: (after.data?.[0]?.median as number | undefined) ?? null,
+      hasFullDay: (before.data?.length ?? 0) > 0,
+    };
+  }
+
+  const rows = await readLines<{ ts: string; median: number | null }>(tickFile(marketId));
+  if (rows.length === 0) return { reference: null, hasFullDay: false };
+  const hasFullDay = new Date(rows[0]!.ts).getTime() < new Date(cutoff).getTime();
+  const match = rows.find(
+    (row) => row.median !== null && new Date(row.ts).getTime() >= new Date(cutoff).getTime(),
+  );
+  return { reference: match?.median ?? null, hasFullDay };
 }

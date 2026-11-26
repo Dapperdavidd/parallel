@@ -1,5 +1,11 @@
-import { NextResponse } from "next/server";
-import { latestTicks, listMarkets, recentTicks, registryMeta } from "@/lib/server/data";
+import {
+  dayChangeReference,
+  latestTicks,
+  listMarkets,
+  registryMeta,
+} from "@/lib/server/data";
+import { CEILINGS, route } from "@/lib/server/request";
+import { ok } from "@/lib/server/respond";
 
 /**
  * F7 — the market board, from the live index.
@@ -11,6 +17,7 @@ import { latestTicks, listMarkets, recentTicks, registryMeta } from "@/lib/serve
  * so a market that is briefly unpriced renders as "paused" rather than blank.
  */
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -30,7 +37,14 @@ export interface LiveMarket {
   acceptingPositions: boolean;
   reason: string | null;
   sources: string[];
+  /** How many sources were in the median, and how many we tried. */
+  sourceCount: number;
+  sourcesTried: number;
   ts: string | null;
+  /** Seconds since the index last produced a figure for this market. */
+  ageSeconds: number | null;
+  /** Plain words for why a market is not accepting positions. */
+  pausedBecause: string | null;
   /** Percent change over the last 24h of index history. */
   change24hPct: number | null;
   lastPushTx: string | null;
@@ -47,57 +61,91 @@ export interface LiveMarket {
  * launched an hour ago has no 24h change, and showing "0.00%" would be a
  * number we made up.
  */
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 function change24h(
-  history: { ts: string; median: number | null }[],
+  day: { reference: number | null; hasFullDay: boolean },
   latest: number | null,
 ): number | null {
-  if (latest === null || history.length === 0) return null;
-  const cutoff = Date.now() - DAY_MS;
-  const oldest = history[0]!;
-  if (new Date(oldest.ts).getTime() > cutoff) return null; // not a full day yet
-  const reference = history.find(
-    (h) => h.median !== null && new Date(h.ts).getTime() >= cutoff,
-  );
-  if (!reference || reference.median === null || reference.median === 0) return null;
-  return ((latest - reference.median) / reference.median) * 100;
+  if (latest === null || !day.hasFullDay) return null;
+  if (day.reference === null || day.reference === 0) return null;
+  return ((latest - day.reference) / day.reference) * 100;
 }
 
-export async function GET(): Promise<NextResponse> {
-  const [markets, ticks, meta] = await Promise.all([listMarkets(), latestTicks(), registryMeta()]);
-
-  const histories = await Promise.all(
-    markets.map((m) => recentTicks(m.id, 900).catch(() => [])),
-  );
-
-  const rows: LiveMarket[] = markets.map((m, i) => {
-    const t = ticks.get(m.id);
-    return {
-      code: m.currency,
-      id: m.id,
-      median: t?.median ?? null,
-      official: t?.official ?? null,
-      premiumPct: t?.premiumPct ?? null,
-      unitPriceUsd: t?.unitPriceUsd ?? null,
-      unitLabel: m.unitLabel,
-      maxLeverage: m.maxLeverage,
-      status: t?.status ?? "unknown",
-      acceptingPositions: t?.status === "ok",
-      reason: t?.reason ?? null,
-      sources: t?.sourcesUsed ?? [],
-      ts: t?.ts ?? null,
-      change24hPct: change24h(histories[i] ?? [], t?.median ?? null),
-      lastPushTx: t?.pushedTx ?? null,
-      marketAccount: m.market,
-      collateralVault: m.vault,
-      maxNotionalUsdc: m.liquidityVault?.maxNotionalUsdc ?? null,
-      maxOpenInterestUsdc: m.liquidityVault?.maxOpenInterestUsdc ?? null,
-    };
-  });
-
-  return NextResponse.json(
-    { markets: rows, collateralMint: meta?.collateralMint ?? null, at: new Date().toISOString() },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+/**
+ * Why this market is not accepting positions, in words a trader can act on.
+ *
+ * The status codes are the index service's own vocabulary. A screen showing
+ * "paused_few_sources" is telling somebody their money is unavailable and
+ * refusing to say why.
+ */
+function pausedBecause(status: string, reason: string | null): string | null {
+  if (status === "ok") return null;
+  if (status === "paused_few_sources") {
+    return (
+      "Not enough independent price sources are reachable right now, so we will not " +
+      "quote a price. Trading reopens by itself when they come back."
+    );
+  }
+  if (status === "paused_official_band") {
+    return (
+      "The street price has moved far enough from the published official rate that we " +
+      "treat it as unreliable until it settles."
+    );
+  }
+  if (status === "unknown") {
+    return "This market has not produced a price yet.";
+  }
+  return reason ?? "This market is paused.";
 }
+
+export const GET = route(
+  "markets",
+  { ceiling: CEILINGS.read, sameOrigin: false },
+  async (): Promise<Response> => {
+    const [markets, ticks, meta] = await Promise.all([listMarkets(), latestTicks(), registryMeta()]);
+
+    // Two small indexed lookups per market, rather than a day of ticks each.
+    const days = await Promise.all(
+      markets.map((m) =>
+        dayChangeReference(m.id).catch(() => ({ reference: null, hasFullDay: false })),
+      ),
+    );
+
+    const now = Date.now();
+    const rows: LiveMarket[] = markets.map((m, i) => {
+      const t = ticks.get(m.id);
+      const status = t?.status ?? "unknown";
+      return {
+        code: m.currency,
+        id: m.id,
+        median: t?.median ?? null,
+        official: t?.official ?? null,
+        premiumPct: t?.premiumPct ?? null,
+        unitPriceUsd: t?.unitPriceUsd ?? null,
+        unitLabel: m.unitLabel,
+        maxLeverage: m.maxLeverage,
+        status,
+        acceptingPositions: status === "ok",
+        reason: t?.reason ?? null,
+        sources: t?.sourcesUsed ?? [],
+        sourceCount: t?.sourcesUsed?.length ?? 0,
+        sourcesTried: t?.breakdown?.length ?? t?.sourcesUsed?.length ?? 0,
+        ts: t?.ts ?? null,
+        ageSeconds: t?.ts ? Math.max(0, Math.round((now - new Date(t.ts).getTime()) / 1000)) : null,
+        pausedBecause: pausedBecause(status, t?.reason ?? null),
+        change24hPct: change24h(days[i] ?? { reference: null, hasFullDay: false }, t?.median ?? null),
+        lastPushTx: t?.pushedTx ?? null,
+        marketAccount: m.market,
+        collateralVault: m.vault,
+        maxNotionalUsdc: m.liquidityVault?.maxNotionalUsdc ?? null,
+        maxOpenInterestUsdc: m.liquidityVault?.maxOpenInterestUsdc ?? null,
+      };
+    });
+
+    return ok(
+      { markets: rows, collateralMint: meta?.collateralMint ?? null, at: new Date().toISOString() },
+      // The index moves every two minutes, so a few seconds of shared cache
+      // costs nothing and takes the repeat polling off the database.
+      { "Cache-Control": "public, max-age=5, stale-while-revalidate=55" },
+    );
+  },
+);

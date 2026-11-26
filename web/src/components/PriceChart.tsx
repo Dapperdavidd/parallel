@@ -72,9 +72,6 @@ const STEP_SECONDS: Record<Timeframe, number> = {
 const ZOOM_GAIN = 320;
 /** A pinch (a wheel event with ctrl held) is a deliberate, finer gesture. */
 const PINCH_GAIN = 90;
-/** Nothing good comes of zooming past a handful of bars, or past the series. */
-const MIN_SPAN_BARS = 5;
-
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
 /** The library's own floor; declared here because the arithmetic below needs it. */

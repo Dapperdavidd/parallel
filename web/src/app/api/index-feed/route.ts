@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
 import { latestTicks, listMarkets, registryMeta } from "@/lib/server/data";
+import { CEILINGS, route } from "@/lib/server/request";
+import { ok } from "@/lib/server/respond";
 
 /**
  * F11 — the public index page.
@@ -12,10 +13,11 @@ import { latestTicks, listMarkets, registryMeta } from "@/lib/server/data";
  * should be able to recompute our number from this response alone.
  */
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET(): Promise<NextResponse> {
+export const GET = route("index-feed", { ceiling: CEILINGS.read, sameOrigin: false }, async () => {
   const [markets, ticks, meta] = await Promise.all([
     listMarkets(),
     latestTicks(),
@@ -46,7 +48,7 @@ export async function GET(): Promise<NextResponse> {
     };
   });
 
-  return NextResponse.json(
+  return ok(
     {
       network: "devnet",
       ...meta,
@@ -61,6 +63,6 @@ export async function GET(): Promise<NextResponse> {
       markets: rows,
       at: new Date().toISOString(),
     },
-    { headers: { "Cache-Control": "no-store" } },
+    { "Cache-Control": "public, max-age=15, stale-while-revalidate=105" },
   );
-}
+});

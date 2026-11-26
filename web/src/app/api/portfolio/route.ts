@@ -1,6 +1,9 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import { NextRequest, NextResponse } from "next/server";
 import { listMarkets, registryMeta } from "@/lib/server/data";
+import { rpcUrl } from "@/lib/server/env";
+import { CEILINGS, route } from "@/lib/server/request";
+import { ok, reject } from "@/lib/server/respond";
+import { address, query } from "@/lib/server/validate";
 import {
   PERCOLATOR_PROGRAM_ID,
   PORTFOLIO_ACCOUNT_LEN,
@@ -30,35 +33,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const fail = (error: string, status = 400): NextResponse =>
-  NextResponse.json({ error }, { status });
-
 const abs = (value: bigint): bigint => (value < 0n ? -value : value);
 
-/** Devnet only, like every other signing or reading path in the app. */
-function connection(): Connection {
-  const rpc =
-    process.env.SOLANA_RPC_URL ??
-    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ??
-    "https://api.devnet.solana.com";
-  if (!/devnet/i.test(rpc)) throw new Error("The portfolio read refuses a non-devnet RPC");
-  return new Connection(rpc, "confirmed");
-}
+export const GET = route("portfolio", { ceiling: CEILINGS.read }, async ({ url }) => {
+  const wallet = query(url, "wallet", address());
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
-  let wallet: PublicKey;
-  try {
-    wallet = new PublicKey(request.nextUrl.searchParams.get("wallet") ?? "");
-  } catch {
-    return fail("A valid wallet address is required");
-  }
-
-  try {
+  {
     const [markets, meta] = await Promise.all([listMarkets(), registryMeta()]);
-    if (!meta?.collateralMint) return fail("The collateral mint is unavailable", 503);
+    if (!meta?.collateralMint) reject("unavailable", "This deployment has no collateral mint yet");
 
-    const conn = connection();
-    const mint = new PublicKey(meta.collateralMint);
+    const conn = new Connection(rpcUrl(), "confirmed");
+    const mint = new PublicKey(meta!.collateralMint!);
     const [slot, accounts, tokenAccounts] = await Promise.all([
       conn.getSlot("confirmed"),
       conn.getProgramAccounts(PERCOLATOR_PROGRAM_ID, {
@@ -135,7 +120,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       ];
     });
 
-    return NextResponse.json(
+    return ok(
       {
         wallet: wallet.toBase58(),
         slot,
@@ -145,9 +130,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         totalEquityAtoms: (walletAtoms + portfolioEquityAtoms).toString(),
         portfolios,
       },
-      { headers: { "Cache-Control": "no-store" } },
+      // Somebody's own balance: never shared, never stored.
+      { "Cache-Control": "private, no-store" },
     );
-  } catch (error) {
-    return fail(error instanceof Error ? error.message : "The portfolio read failed", 503);
   }
-}
+});

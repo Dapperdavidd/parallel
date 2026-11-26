@@ -31,7 +31,6 @@ import {
 } from "@solana/spl-token";
 import {
   PERCOLATOR_PROGRAM_ID,
-  ensureFunded,
   getConnection,
   loadOrCreateWallet,
   nowSlot,

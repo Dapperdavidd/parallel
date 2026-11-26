@@ -27,7 +27,12 @@
     "backfill": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/services/backfill-official.ts",
     "store:check": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/tools/store-check.ts",
     "sources:probe": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/tools/probe-sources.ts",
-    "dns:check": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/tools/dns-check.ts"
+    "dns:check": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/tools/dns-check.ts",
+    "signer": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/services/signer.ts",
+    "test": "tsx --test \"test/**/*.test.ts\"",
+    "test:all": "npm test && npm --prefix web test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
@@ -38,8 +43,18 @@
     "undici": "^8.13.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@next/eslint-plugin-next": "^15.5.29",
     "@types/node": "^22.10.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.74.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1",
+    "stream-json": "^3.9.0"
   }
 }

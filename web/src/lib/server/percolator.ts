@@ -1,6 +1,7 @@
 import "server-only";
 
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { warn } from "./log";
 
 export const PERCOLATOR_PROGRAM_ID = new PublicKey(
   "Bu1J8eQQN2mNnUgisSEd5StBG6zDaRb7fwDjN34VzgLG",
@@ -121,4 +122,90 @@ export function tradeNoCpi(args: {
       u64le(0n),
     ]),
   });
+}
+
+/**
+ * How far the engine's price may sit from our own index before we refuse.
+ *
+ * Every offset in this file is a byte position in an account Percolator owns,
+ * read from the v16 layout. If that program is upgraded and a field moves, the
+ * parse does not fail — it returns a number from the wrong place, and a trade
+ * would be priced on it. There is no version byte in the account to check
+ * against, and the program's upgrade-data account does not resolve on devnet,
+ * so the strongest available check is a cross-reference: the effective price
+ * must look like the price our own index measured.
+ *
+ * In practice the two sit within about 5% of each other, because the keeper
+ * pushes on a 0.1% move or every ten minutes. A misread field would be out by
+ * orders of magnitude, so the band only has to be loose enough never to
+ * inconvenience a real trade.
+ */
+const ENGINE_PRICE_BAND = 0.4;
+/** Outside this, something is wrong but trading can continue; say so. */
+const ENGINE_PRICE_DRIFT_WARNING = 0.1;
+
+export class EngineLayoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EngineLayoutError";
+  }
+}
+
+/**
+ * Refuse to trade against a price that cannot be right.
+ *
+ * Returns the signed drift, in basis points, for the caller to show as part of
+ * the quote: it is the honest "execution versus index" figure, and the only
+ * number that tells a trader where they will actually be filled.
+ */
+export function assertEnginePriceSane(
+  effectivePriceE6: bigint,
+  indexUnitPriceUsd: number,
+  marketId: string,
+): number {
+  if (!(indexUnitPriceUsd > 0)) {
+    throw new EngineLayoutError("The index has no price for this market");
+  }
+  const engine = Number(effectivePriceE6) / 1e6;
+  if (!(engine > 0)) {
+    throw new EngineLayoutError("The engine reports no price for this market");
+  }
+  const drift = engine / indexUnitPriceUsd - 1;
+  if (Math.abs(drift) > ENGINE_PRICE_BAND) {
+    throw new EngineLayoutError(
+      "The engine price disagrees with the index beyond what we will trade on",
+    );
+  }
+  if (Math.abs(drift) > ENGINE_PRICE_DRIFT_WARNING) {
+    warn({
+      event: "engine_price_drift",
+      marketId,
+      engine,
+      index: indexUnitPriceUsd,
+      driftBps: Math.round(drift * 10_000),
+    });
+  }
+  return Math.round(drift * 10_000);
+}
+
+/**
+ * Where the position is wiped out, to the nearest honest approximation.
+ *
+ * Percolator holds maintenance margin in the market account, at an offset this
+ * app does not read, so this is the textbook figure: a position is gone when
+ * the price has moved against it by its own margin, which is `1/leverage` of
+ * the notional. It ignores fees and accrued funding, both of which bring the
+ * real liquidation slightly nearer, so it is quoted as an approximation and
+ * never as a promise.
+ */
+export function approximateLiquidationPrice(
+  entryPriceUsd: number,
+  leverage: number,
+  side: "long" | "short",
+): number {
+  if (leverage <= 0) throw new Error("Leverage must be positive");
+  const move = entryPriceUsd / leverage;
+  // A user-facing long profits when the local currency strengthens, i.e. when
+  // the USD-per-unit price rises, so it is liquidated below entry.
+  return side === "long" ? Math.max(0, entryPriceUsd - move) : entryPriceUsd + move;
 }

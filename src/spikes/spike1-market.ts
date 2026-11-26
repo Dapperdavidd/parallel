@@ -280,7 +280,7 @@ async function main(): Promise<void> {
         await send(conn, [admin], [ix], { label: `ConfigureAuthMark (${wire} wire)` });
         accepted = wire;
         break;
-      } catch (err) {
+      } catch {
         console.log(`    ${RED}${wire} wire rejected${OFF}`);
       }
     }

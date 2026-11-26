@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
 import { candles, listMarkets, officialHistory, recentTicks } from "@/lib/server/data";
+import { CEILINGS, route } from "@/lib/server/request";
+import { ok } from "@/lib/server/respond";
+import { oneOf, query, text, withDefault } from "@/lib/server/validate";
 
 /**
  * F6 — candles for the price chart.
@@ -11,10 +13,11 @@ import { candles, listMarkets, officialHistory, recentTicks } from "@/lib/server
  * long invented one.
  */
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const TIMEFRAMES = new Set(["1H", "4H", "1D", "1W", "1M"]);
+const TIMEFRAMES = ["1H", "4H", "1D", "1W", "1M"] as const;
 
 /** Same boundaries the keeper rolls index candles on, so the axes line up. */
 const TIMEFRAME_MINUTES: Record<string, number> = {
@@ -90,17 +93,9 @@ function officialCandles(
   return out.length >= 2 && minutes >= 24 * 60 ? out : null;
 }
 
-export async function GET(req: Request): Promise<NextResponse> {
-  const url = new URL(req.url);
-  const market = url.searchParams.get("market");
-  const tf = url.searchParams.get("tf") ?? "1H";
-
-  if (!market) {
-    return NextResponse.json({ error: "market is required" }, { status: 400 });
-  }
-  if (!TIMEFRAMES.has(tf)) {
-    return NextResponse.json({ error: `unknown timeframe ${tf}` }, { status: 400 });
-  }
+export const GET = route("candles", { ceiling: CEILINGS.read, sameOrigin: false }, async ({ url }) => {
+  const market = query(url, "market", text({ max: 16, pattern: /^USD\/[A-Z]{3}$/ }));
+  const tf = query(url, "tf", withDefault(oneOf(TIMEFRAMES), "1H"));
 
   const [rolled, ticks, official, markets] = await Promise.all([
     candles(market, tf, 300),
@@ -115,7 +110,7 @@ export async function GET(req: Request): Promise<NextResponse> {
   const unit = markets.find((m) => m.id === market)?.unit ?? 1;
   const quote = (unitPrice: number): number => (unitPrice > 0 ? unit / unitPrice : 0);
 
-  return NextResponse.json(
+  return ok(
     {
       market,
       timeframe: tf,
@@ -145,7 +140,9 @@ export async function GET(req: Request): Promise<NextResponse> {
         official.map((o) => ({ date: o.date, rate: o.rate })),
         tf,
       ),
+      /** When the newest point in this series was measured. */
+      at: ticks.length > 0 ? ticks[ticks.length - 1]!.ts : null,
     },
-    { headers: { "Cache-Control": "no-store" } },
+    { "Cache-Control": "public, max-age=10, stale-while-revalidate=110" },
   );
-}
+});

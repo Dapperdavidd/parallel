@@ -52,7 +52,7 @@ export default function HedgePage() {
   const [hedges, setHedges] = useState<StoredHedge[]>([]);
   // The wallet balance comes from the shared chain snapshot, so opening a
   // hedge here updates the app bar and the portfolio with it.
-  const { walletBalance, snapshot, reload } = useChainPortfolio();
+  const { walletBalance, reload } = useChainPortfolio();
 
   const m = useMarket(code);
   const usd = m.px > 0 ? amount / m.px : 0;

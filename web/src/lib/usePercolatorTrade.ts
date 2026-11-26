@@ -18,6 +18,40 @@ import {
   PORTFOLIO_ACCOUNT_LEN,
 } from "./percolator-client";
 
+/**
+ * What the server quoted, for the ticket to show before and after.
+ *
+ * Mirrors the `quote` block from `/api/trade/prepare`. It is the only place a
+ * fill price, the gap to the index and the liquidation estimate come from —
+ * the client never recomputes them, so the screen and the chain cannot
+ * disagree.
+ */
+export interface TradeQuote {
+  marketId: string;
+  side: "long" | "short";
+  marginUsdc: number;
+  leverage: number;
+  notionalUsdc: number;
+  entryPrice: number;
+  indexPrice: number | null;
+  priceImpactBps: number;
+  priceMoveBps: number;
+  maxSlippageBps: number;
+  approximateLiquidationPrice: number;
+  expiresAt: string;
+  expiresInSeconds: number;
+}
+
+export interface OpenInput {
+  code: string;
+  side: "long" | "short";
+  marginUsdc: number;
+  leverage: number;
+  /** The price on screen, in micro-dollars per contract, if known. */
+  expectedPriceE6?: number;
+  maxSlippageBps?: number;
+}
+
 interface MarketConfig {
   code: string;
   id: string;
@@ -126,7 +160,7 @@ function usePercolatorTradeValue() {
   // Returns the portfolio and market alongside the signature, because hedge
   // mode has to file its intent against the exact position it just opened.
   const openWithContext = useCallback(
-    async (input: { code: string; side: "long" | "short"; marginUsdc: number; leverage: number }) => {
+    async (input: OpenInput) => {
       const wallet = wallets[0];
       if (!wallet) throw new Error("Your Solana wallet is not ready");
       const marketResponse = await fetch("/api/markets", { cache: "no-store" });
@@ -149,31 +183,46 @@ function usePercolatorTradeValue() {
           side: input.side,
           marginUsdc: input.marginUsdc,
           leverage: input.leverage,
+          // What the terminal was showing when the person committed, so the
+          // server can refuse a fill that has drifted past their tolerance
+          // rather than filling it quietly.
+          expectedPriceE6: input.expectedPriceE6,
+          maxSlippageBps: input.maxSlippageBps,
         }),
       });
-      const body = (await prepared.json()) as { transaction?: string; error?: string };
-      if (!prepared.ok || !body.transaction) throw new Error(body.error ?? "Trade preparation failed");
+      const body = (await prepared.json()) as {
+        transaction?: string;
+        quoteToken?: string;
+        quote?: TradeQuote;
+        error?: string;
+      };
+      if (!prepared.ok || !body.transaction || !body.quoteToken) {
+        throw new Error(body.error ?? "Trade preparation failed");
+      }
       const signature = await send(bytesFromBase64(body.transaction));
-      await fetch("/api/trades", {
+      // The quote is the server's own arithmetic, signed. History is written
+      // from it, so nothing about this trade is recorded on our word for it.
+      const recorded = await fetch("/api/trades", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          signature,
-          wallet: wallet.address,
-          portfolio,
-          marketId: market.id,
-          action: "open",
-          leverage: input.leverage,
-        }),
-      }).catch(() => undefined);
-      return { signature, portfolio, marketId: market.id };
+        body: JSON.stringify({ signature, quoteToken: body.quoteToken }),
+      })
+        .then((response) => response.ok)
+        .catch(() => false);
+      return {
+        signature,
+        portfolio,
+        marketId: market.id,
+        quote: body.quote,
+        quoteToken: body.quoteToken,
+        recorded,
+      };
     },
     [wallets, ensurePortfolio, send],
   );
 
   const open = useCallback(
-    async (input: { code: string; side: "long" | "short"; marginUsdc: number; leverage: number }) =>
-      (await openWithContext(input)).signature,
+    async (input: OpenInput) => (await openWithContext(input)).signature,
     [openWithContext],
   );
 
@@ -184,7 +233,14 @@ function usePercolatorTradeValue() {
    * this reports `recorded: false` rather than claiming the hedge failed.
    */
   const hedge = useCallback(
-    async (input: { code: string; amountLocal: number; marginUsdc: number; dueDate: string }) => {
+    async (input: {
+      code: string;
+      amountLocal: number;
+      marginUsdc: number;
+      dueDate: string;
+      expectedPriceE6?: number;
+      maxSlippageBps?: number;
+    }) => {
       const wallet = wallets[0];
       if (!wallet) throw new Error("Your Solana wallet is not ready");
       const context = await openWithContext({
@@ -192,22 +248,22 @@ function usePercolatorTradeValue() {
         side: "long",
         marginUsdc: input.marginUsdc,
         leverage: 1,
+        expectedPriceE6: input.expectedPriceE6,
+        maxSlippageBps: input.maxSlippageBps,
       });
       const recorded = await fetch("/api/hedge", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           signature: context.signature,
-          wallet: wallet.address,
-          portfolio: context.portfolio,
-          marketId: context.marketId,
+          quoteToken: context.quoteToken,
           amountLocal: input.amountLocal,
           dueDate: input.dueDate,
         }),
       })
         .then((response) => response.ok)
         .catch(() => false);
-      return { signature: context.signature, recorded };
+      return { signature: context.signature, recorded, quote: context.quote };
     },
     [wallets, openWithContext],
   );
@@ -233,20 +289,19 @@ function usePercolatorTradeValue() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ wallet: wallet.address, portfolio, marketId: market.id }),
       });
-      const body = (await prepared.json()) as { transaction?: string; error?: string };
-      if (!prepared.ok || !body.transaction) throw new Error(body.error ?? "Close preparation failed");
+      const body = (await prepared.json()) as {
+        transaction?: string;
+        quoteToken?: string;
+        error?: string;
+      };
+      if (!prepared.ok || !body.transaction || !body.quoteToken) {
+        throw new Error(body.error ?? "Close preparation failed");
+      }
       const signature = await send(bytesFromBase64(body.transaction));
       await fetch("/api/trades", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          signature,
-          wallet: wallet.address,
-          portfolio,
-          marketId: market.id,
-          action: "close",
-          leverage: 1,
-        }),
+        body: JSON.stringify({ signature, quoteToken: body.quoteToken }),
       }).catch(() => undefined);
       return signature;
     },
