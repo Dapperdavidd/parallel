@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { byCode } from "@/lib/mock";
+import { MARKETS } from "@/lib/mock";
 import { useMarket } from "@/lib/live";
 import { useDemo } from "@/lib/store";
 import { useChainPortfolio } from "@/lib/useChainPortfolio";
@@ -29,6 +30,8 @@ import { BottomPanel } from "./BottomPanel";
  * Percolator settles against a matcher, not a central limit order book, so a
  * book would be invented liquidity.
  */
+const MARKET_COUNT = MARKETS.length;
+
 export function TradeView() {
   const params = useSearchParams();
   const { market: stateMarket, setMarket } = useDemo();
@@ -42,7 +45,9 @@ export function TradeView() {
   }, [requested, stateMarket, setMarket]);
 
   // Live street price where the index has it; sample values where it does not.
-  const code = byCode(requested ?? stateMarket).c;
+  // The requested code is taken as written rather than coerced to a market we
+  // do have — `useMarket` reports `known: false` and the screen says so.
+  const code = (requested ?? stateMarket).toUpperCase();
   const m = useMarket(code);
 
   // The chart says what it is actually drawing — measured index, or the
@@ -71,6 +76,33 @@ export function TradeView() {
           ? `Official rate history · street index from ${new Date(source.indexFrom).toLocaleDateString()}`
           : "Official rate history · street index building"
         : "Sample data";
+
+  // A link or a stored preference can name a market we do not have. Saying so
+  // is the only honest option: the alternative renders another currency's
+  // price under this one's name.
+  if (!m.known) {
+    return (
+      <div className="tpage">
+        <div className="tbody">
+          <section className="panel" style={{ padding: 32, display: "grid", gap: 14 }}>
+            <h1 style={{ margin: 0, fontSize: 22 }}>No market called USD/{code}</h1>
+            <p style={{ margin: 0, color: "var(--ink2)", maxWidth: "52ch", lineHeight: 1.6 }}>
+              {m.pausedBecause} Parallel trades {MARKET_COUNT} emerging-market currencies — pick one
+              from the board.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Link className="btn btn-pri" href="/app/markets">
+                See the markets
+              </Link>
+              <button type="button" className="btn" onClick={() => setMarket("NGN")}>
+                Go to USD/NGN
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tpage">

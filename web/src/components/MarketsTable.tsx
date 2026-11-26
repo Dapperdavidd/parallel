@@ -15,12 +15,21 @@ function CurrencyBadge({ m, small = false }: { m: Market; small?: boolean }) {
   );
 }
 
-export function StatusPill({ m, paused }: { m: Market; paused?: boolean }) {
+export function StatusPill({
+  m,
+  paused,
+  reason,
+}: {
+  m: Market;
+  paused?: boolean;
+  /** Plain words from the index, when there are any. */
+  reason?: string | null;
+}) {
   // A paused market is not a tier — it is a market whose sources went away,
   // and it must not read as "Live" while that is true.
   if (paused) {
     return (
-      <span className="status" title="Not enough live sources — no new positions">
+      <span className="status" title={reason ?? "Not enough live sources — no new positions"}>
         <span className="dot" style={{ background: "var(--dn)" }} />
         Paused
       </span>

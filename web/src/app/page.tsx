@@ -4,6 +4,8 @@ import { IntroStage } from "@/components/IntroStage";
 import { FeatureScroll } from "@/components/FeatureScroll";
 import { CtaCanvas } from "@/components/CtaCanvas";
 import { Footer } from "@/components/Footer";
+import { FAUCET_USDC_TARGET } from "@/lib/faucet";
+import { fmt } from "@/lib/mock";
 
 export default function HomePage() {
   return (
@@ -20,7 +22,7 @@ export default function HomePage() {
           <CtaCanvas />
           <div className="cta-copy">
             <h2 style={{ fontSize: "clamp(44px,5.6vw,84px)", letterSpacing: "-.045em", lineHeight: 1 }}>
-              Sign up. Get 10,000
+              Sign up. Get {fmt(FAUCET_USDC_TARGET, 0)}
               <br />
               test dollars.
             </h2>
@@ -37,8 +39,12 @@ export default function HomePage() {
                 Create account
               </Link>
             </div>
+            {/* "Mainnet coming soon" was a promise with no date behind it.
+                The FAQ answers this honestly — audited contracts and a clear
+                legal position in each country first — and this line should
+                not contradict it. */}
             <span style={{ fontSize: 13, color: "var(--ink3)" }}>
-              Devnet beta · test money only · mainnet coming soon
+              Devnet beta · test money only · no mainnet date yet
             </span>
 
             {/* Risk sits with the sign-up, where it is actually relevant,

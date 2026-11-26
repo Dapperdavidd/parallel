@@ -71,6 +71,24 @@ export const MARKETS: Market[] = [
  */
 export const LANDING_ROWS = ["NGN", "ARS", "INR", "TRY", "GHS", "KES"];
 
+/**
+ * A market by code, or nothing.
+ *
+ * Use this for any code that came from outside the codebase — a query string,
+ * a stored preference, an API response. `byCode` below quietly answers with
+ * the naira for anything it does not recognise, which is correct for a
+ * literal and wrong for user input: it showed "Nigerian naira" on a screen
+ * whose own URL said something else.
+ */
+export const findMarket = (c: string): Market | undefined =>
+  MARKETS.find((m) => m.c === c);
+
+/**
+ * A market by a code you already know exists.
+ *
+ * Falls back to the first market, which makes it safe for a literal and
+ * unsafe for anything else. For user input use `findMarket`.
+ */
 export const byCode = (c: string): Market =>
   MARKETS.find((m) => m.c === c) ?? MARKETS[0]!;
 

@@ -77,6 +77,46 @@ svg{flex:none}
 .mrow{display:grid;grid-template-columns:minmax(220px,2.2fr) minmax(80px,.8fr) minmax(110px,1fr) minmax(110px,1fr) minmax(110px,1fr) minmax(130px,1fr);align-items:center;gap:16px;padding:20px 28px;border-top:1px solid var(--ln);min-width:900px}
 a.mrow:hover{background:#ffffff06}
 .mrow.head{border-top:none;padding:22px 28px 14px;font-size:12px;letter-spacing:.08em;color:var(--ink3)}
+
+/* A landing illustration says so, so a made-up balance cannot read as a
+   claim about what somebody earned. */
+.mock-tag{font-style:normal;font-size:9px;letter-spacing:.09em;text-transform:uppercase;
+  padding:2px 5px;border-radius:3px;color:var(--ink3);background:rgba(255,255,255,.06)}
+
+/* ---- market board controls ---------------------------------------------- */
+.mhead{display:flex;justify-content:space-between;align-items:flex-end;
+  flex-wrap:wrap;gap:12px;margin-bottom:16px}
+.mfilters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+/* Deliberately not `.chip`: that name is taken by the Devnet badge on the
+   app bar, which is amber and is hidden below 820px — these must not be. */
+.mchip{height:30px;padding:0 13px;border-radius:999px;border:1px solid var(--ln);
+  background:transparent;color:var(--ink2);font-size:13px;cursor:pointer;
+  transition:border-color .12s ease,color .12s ease,background .12s ease}
+.mchip:hover{color:var(--ink);border-color:var(--ln2,var(--ln))}
+.mchip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* A sortable column header is a button, so it has to stop looking like one. */
+.msort{display:inline-flex;align-items:center;gap:5px;background:none;border:0;padding:0;
+  font:inherit;font-size:12px;letter-spacing:.08em;color:var(--ink3);cursor:pointer;
+  text-align:left}
+.msort:hover{color:var(--ink2)}
+.msort.on{color:var(--ink)}
+.msort i{font-style:normal;font-size:10px}
+
+.mgroup{display:contents}
+.mtable .mgroup{display:block}
+.mwhy{margin:0;padding:0 28px 16px 70px;font-size:13px;color:var(--amb);
+  line-height:1.5;max-width:76ch}
+
+.star{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  padding:0;border:0;background:none;color:var(--ink3);cursor:pointer;flex:0 0 auto;
+  border-radius:4px;transition:color .12s ease}
+.star:hover{color:var(--ink2)}
+.star.on{color:var(--amb)}
+
+@media (max-width:860px){
+  .mwhy{padding:0 16px 14px 16px}
+}
 /* On a phone only the three columns that matter survive, and the row stops
    being a horizontal scroller. */
 @media (max-width:620px){
@@ -639,6 +679,39 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
 .hstat{display:flex;flex-direction:column;gap:2px}
 .hstat-l{font-size:11px;color:var(--ink3);white-space:nowrap}
 .hstat-v{font-size:13.5px;font-weight:500;color:var(--ink);white-space:nowrap}
+
+/* ---- where a number came from -------------------------------------------
+   Three kinds of figure share the stats row and they are not equally real:
+   measured, sample, and a measurement that has gone stale. A trader who
+   cannot tell them apart is reading invented volume as though somebody had
+   traded. The tag is small on purpose — present when you look for it,
+   quiet when you are reading prices. */
+.hstat-tag{margin-left:5px;font-style:normal;font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;padding:1px 4px;border-radius:3px;
+  color:var(--ink3);background:rgba(255,255,255,.06);vertical-align:1px}
+.hstat.is-sample .hstat-v{color:var(--ink2)}
+.hstat.is-stale .hstat-tag{color:var(--amb);background:rgba(242,169,59,.14)}
+.hstat.is-stale .hstat-v{color:var(--amb)}
+
+/* ---- the freshness pill, first in the row ------------------------------- */
+.hfresh .hstat-v{display:inline-flex;align-items:center;gap:6px;font-size:12px;
+  font-weight:500;letter-spacing:.01em}
+.hfresh .fresh-dot{width:6px;height:6px;border-radius:50%;background:var(--ink3);flex:0 0 auto}
+.hfresh.is-live .fresh-dot{background:var(--up);box-shadow:0 0 0 3px rgba(46,189,133,.16)}
+.hfresh.is-live .hstat-v{color:var(--up)}
+.hfresh.is-stale .fresh-dot{background:var(--amb)}
+.hfresh.is-stale .hstat-v{color:var(--amb)}
+.hfresh.is-down .fresh-dot{background:var(--dn)}
+.hfresh.is-down .hstat-v{color:var(--dn)}
+.hfresh.is-sample .hstat-v{color:var(--ink2)}
+
+@media (prefers-reduced-motion: no-preference){
+  .hfresh.is-live .fresh-dot{animation:fresh-pulse 2.6s ease-in-out infinite}
+}
+@keyframes fresh-pulse{
+  0%,100%{box-shadow:0 0 0 3px rgba(46,189,133,.16)}
+  50%{box-shadow:0 0 0 5px rgba(46,189,133,.05)}
+}
 
 /* Body: chart | trades | ticket */
 .tbody{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 260px 300px;min-height:0}

@@ -4,6 +4,7 @@ import {
   listMarkets,
   registryMeta,
 } from "@/lib/server/data";
+import { engineMarks } from "@/lib/server/marks";
 import { CEILINGS, route } from "@/lib/server/request";
 import { ok } from "@/lib/server/respond";
 
@@ -30,6 +31,19 @@ export interface LiveMarket {
   premiumPct: number | null;
   /** USD price of one contract — what Percolator is told. */
   unitPriceUsd: number | null;
+  /**
+   * The engine's own effective price for one contract, read from the chain.
+   * Null when the market account is unreadable. Close to `unitPriceUsd` but
+   * not equal to it — the difference is the basis.
+   */
+  markUnitPriceUsd: number | null;
+  /** The engine's price in the familiar quote scale, local currency per USD. */
+  mark: number | null;
+  /** Mark against index, in basis points. Null when either is missing. */
+  basisBps: number | null;
+  /** Open interest the engine is actually carrying, in tUSDC. */
+  openInterestLongUsdc: number | null;
+  openInterestShortUsdc: number | null;
   unitLabel: string;
   maxLeverage: number;
   status: string;
@@ -101,7 +115,15 @@ export const GET = route(
   "markets",
   { ceiling: CEILINGS.read, sameOrigin: false },
   async (): Promise<Response> => {
-    const [markets, ticks, meta] = await Promise.all([listMarkets(), latestTicks(), registryMeta()]);
+    const [markets, ticks, meta, marks] = await Promise.all([
+      listMarkets(),
+      latestTicks(),
+      registryMeta(),
+      // One batched account read for all thirteen, memoised — the engine's
+      // price is a different quantity from the index and the terminal
+      // labels it as one.
+      engineMarks(),
+    ]);
 
     // Two small indexed lookups per market, rather than a day of ticks each.
     const days = await Promise.all(
@@ -114,6 +136,11 @@ export const GET = route(
     const rows: LiveMarket[] = markets.map((m, i) => {
       const t = ticks.get(m.id);
       const status = t?.status ?? "unknown";
+      const mark = marks.get(m.id) ?? null;
+      const basisBps =
+        mark && t?.unitPriceUsd
+          ? Math.round((mark.unitPriceUsd / t.unitPriceUsd - 1) * 10_000)
+          : null;
       return {
         code: m.currency,
         id: m.id,
@@ -121,6 +148,13 @@ export const GET = route(
         official: t?.official ?? null,
         premiumPct: t?.premiumPct ?? null,
         unitPriceUsd: t?.unitPriceUsd ?? null,
+        markUnitPriceUsd: mark?.unitPriceUsd ?? null,
+        // The engine holds USD per contract; every screen shows the familiar
+        // quote. They are reciprocals scaled by the contract size.
+        mark: mark && mark.unitPriceUsd > 0 ? m.unit / mark.unitPriceUsd : null,
+        basisBps,
+        openInterestLongUsdc: mark?.openInterestLongUsdc ?? null,
+        openInterestShortUsdc: mark?.openInterestShortUsdc ?? null,
         unitLabel: m.unitLabel,
         maxLeverage: m.maxLeverage,
         status,

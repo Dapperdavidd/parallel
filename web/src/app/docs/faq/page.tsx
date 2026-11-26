@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MARKETS, premium } from "@/lib/mock";
+import { fmt, MARKETS, premium } from "@/lib/mock";
 import { DocShell, H3 } from "../DocShell";
+import { FAUCET_USDC_TARGET } from "@/lib/faucet";
 
 export const metadata: Metadata = {
   title: "Common questions — Parallel docs",
@@ -26,7 +27,7 @@ export default function FaqPage() {
       <H3>Is this real money?</H3>
       <p>
         Not today. Everything runs on Solana devnet with test tokens that have no value.
-        That is why you can get 10,000 of them for free.
+        That is why you can get {fmt(FAUCET_USDC_TARGET, 0)} of them for free.
       </p>
 
       <H3>Why is your price different from my bank&apos;s?</H3>

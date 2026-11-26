@@ -2,8 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { byCode, fmt, premium, FEATURES } from "@/lib/mock";
+import { FAUCET_USDC_TARGET } from "@/lib/faucet";
 import { Mark } from "./Brand";
 
+/**
+ * The chrome on each illustration, and the label that says it is one.
+ *
+ * These panels are drawings of the product, not the product: the candles are
+ * a deterministic sketch and the balances are made up. Showing a figure like
+ * "+128.40 open P&L" beside a real logo, unlabelled, is a claim about
+ * somebody's returns. The badge is quiet but it is always there.
+ */
 function MockTop({ label }: { label: string }) {
   return (
     <div className="mock-top">
@@ -11,7 +20,12 @@ function MockTop({ label }: { label: string }) {
         <Mark size={18} />
         Parallel
       </span>
-      <span>{label}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {label}
+        <i className="mock-tag" title="An illustration of the screen. The figures are made up.">
+          illustration
+        </i>
+      </span>
     </div>
   );
 }
@@ -134,7 +148,7 @@ function ScreenPortfolio() {
         <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 12, color: "var(--ink3)" }}>Balance</div>
-            <b className="mono" style={{ fontSize: 24 }}>10,000.00</b>
+            <b className="mono" style={{ fontSize: 24 }}>{fmt(FAUCET_USDC_TARGET)}</b>
           </div>
           <div>
             <div style={{ fontSize: 12, color: "var(--ink3)" }}>Open P&amp;L</div>
