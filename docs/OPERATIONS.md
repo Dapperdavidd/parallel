@@ -72,12 +72,14 @@ It needs the oracle authority keypair and, if you want history, the Supabase
 service role key. It does **not** need the web app, and the web app does not
 need it to serve — a stale index shows as stale rather than as an outage.
 
-The cloud target is Northflank Sandbox. The root `Dockerfile` runs the keeper and signer
+The prepared cloud target is Northflank Sandbox. The root `Dockerfile` runs the keeper and signer
 as one always-on service through `npm run cloud`; `/health` belongs to the
 signer and is the deployment health check. If either child exits, the
 supervisor stops the other and exits so Northflank restarts the complete unit.
 Until that service has been created and its secrets injected, the laptop
-supervisor remains the live process.
+supervisor remains the live process. Northflank currently requires a payment
+card before creating even the free service, so live creation is blocked at the
+billing form until the owner explicitly approves a billing method.
 
 ### The signer
 
@@ -98,6 +100,9 @@ policy-checked message and never reads the liquidity keys from disk. A partial
 Turnkey configuration is refused at boot. The Turnkey organization must also
 have a policy limiting the imported authorities to the service credential;
 the application's signer policy remains the second, independent boundary.
+Turnkey's free tier currently stops after 25 signatures and then requires a
+card and paid plan. Do not treat it as the live backend until that cost has
+been explicitly approved; local-key mode remains the deployment fallback.
 
 ### The web app
 
@@ -230,14 +235,16 @@ rather than the last.
 
 ## The honest list of what is not done
 
-- The Northflank service is prepared but not active until the account, secrets,
-  domain, and two-pass verification are completed.
+- The Northflank project and repository link exist, but service creation is
+  blocked at the card-verification form. No billing method was entered; the
+  secrets, domain, deployment, and two-pass verification remain incomplete.
 - Rate limiting counts in one process's memory. Fine for one instance; the
   faucet's own cooldown is durable, so the path that moves value does not rely
   on it.
 - No alerting is wired up. The signals are all exposed; nothing is paging
   anyone.
-- Turnkey support is implemented, but the existing liquidity keys have not yet
-  been imported and its service policy has not yet been created.
+- Turnkey support is implemented, but its 25-signature free allowance is not a
+  production plan. No account, import, credential, or policy exists; local-key
+  mode is required until a paid KMS choice is explicitly approved.
 - Four markets (EGP, GHS, KES, PKR) must be re-probed from Northflank's egress;
   they remain paused whenever fewer than two sources survive.
