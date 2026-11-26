@@ -227,6 +227,27 @@ export default async function VaultsPage() {
             drained by one position cannot be drained by one bug either.
           </p>
 
+          <h2 className="doc-h2">What happens if a vault loses</h2>
+          <p>
+            It can. A vault takes the other side of every trade on its market, so when traders
+            are right, it is wrong — that is what being the counterparty means, and it is the
+            risk we are carrying rather than one we have engineered away.
+          </p>
+          <p>
+            Two things follow, and they are the reason the caps above are set where they are.
+            A vault&rsquo;s loss is <b>bounded by its own capital</b>, because nothing is pooled:
+            there is one portfolio and one signing key per currency, so a market that goes badly
+            cannot reach another market&rsquo;s money. And if a vault&rsquo;s capital ran out, the
+            engine would liquidate <i>it</i> on the same terms it liquidates anybody — Percolator
+            does not know which side is the house.
+          </p>
+          <p>
+            In practice that would show here first: the capital figure falling and the
+            utilisation bar filling. If it ever happened, the market would stop taking new
+            positions long before it mattered, because the open-interest cap is a fraction of
+            the capital behind it. Existing positions would still close.
+          </p>
+
           <h2 className="doc-h2">What is not here yet</h2>
           <p>
             The PRD also describes letting anyone deposit into a vault and earn a share of the

@@ -10,6 +10,7 @@ import {
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
+import { getJson, invalidate } from "./fetcher";
 import {
   associatedTokenAddress,
   deposit,
@@ -179,11 +180,12 @@ function usePercolatorTradeValue() {
     async (input: OpenInput) => {
       const wallet = wallets[0];
       if (!wallet) throw new Error("Your Solana wallet is not ready");
-      const marketResponse = await fetch("/api/markets", { cache: "no-store" });
-      const marketBody = (await marketResponse.json()) as {
+      // The price provider already holds this, and open-then-close used to
+      // fetch it twice in a few seconds. Shared, and good for ten.
+      const marketBody = await getJson<{
         markets: MarketConfig[];
         collateralMint: string | null;
-      };
+      }>("/api/markets", { freshMs: 10_000 });
       const market = marketBody.markets.find((entry) => entry.code === input.code);
       if (!market || !marketBody.collateralMint) throw new Error("Market configuration is unavailable");
       if (!market.acceptingPositions) throw new Error("This market is paused");
@@ -230,6 +232,8 @@ function usePercolatorTradeValue() {
       })
         .then((response) => response.ok)
         .catch(() => false);
+      invalidate("/api/trades");
+      invalidate("/api/portfolio");
       input.onStage?.("done");
       return {
         signature,
@@ -294,8 +298,9 @@ function usePercolatorTradeValue() {
     async (input: { code: string; portfolio?: string; onStage?: (stage: TradeStage) => void }) => {
       const wallet = wallets[0];
       if (!wallet) throw new Error("Your Solana wallet is not ready");
-      const marketResponse = await fetch("/api/markets", { cache: "no-store" });
-      const marketBody = (await marketResponse.json()) as { markets: MarketConfig[] };
+      const marketBody = await getJson<{ markets: MarketConfig[] }>("/api/markets", {
+        freshMs: 10_000,
+      });
       const market = marketBody.markets.find((entry) => entry.code === input.code);
       if (!market) throw new Error("Market configuration is unavailable");
       // The portfolio page reads the real address off the chain, so it can pass
@@ -328,6 +333,8 @@ function usePercolatorTradeValue() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ signature, quoteToken: body.quoteToken }),
       }).catch(() => undefined);
+      invalidate("/api/trades");
+      invalidate("/api/portfolio");
       input.onStage?.("done");
       return signature;
     },

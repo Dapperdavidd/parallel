@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { fmt } from "@/lib/mock";
 import type { MarketView } from "@/lib/live";
 import { explorerTx, shortSignature } from "@/lib/explorer";
+import { getJson } from "@/lib/fetcher";
+import { WALLET_TRADES } from "@/lib/useChainPortfolio";
 
 /**
  * The wallet's own trade history.
@@ -103,17 +105,11 @@ export function TradeHistory({
       return;
     }
     const controller = new AbortController();
-    void fetch(`/api/trades?wallet=${encodeURIComponent(wallet)}&limit=60`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        const body = (await response.json()) as {
-          trades?: StoredTrade[];
-          nextCursor?: string | null;
-          error?: string;
-        };
-        if (!response.ok) throw new Error(body.error ?? "History is unavailable");
+    void getJson<{ trades?: StoredTrade[]; nextCursor?: string | null }>(
+      WALLET_TRADES(encodeURIComponent(wallet)),
+      { freshMs: 2_000, signal: controller.signal },
+    )
+      .then((body) => {
         setTrades(body.trades ?? []);
         setCursor(body.nextCursor ?? null);
         setError(null);

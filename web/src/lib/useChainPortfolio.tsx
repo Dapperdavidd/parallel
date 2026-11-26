@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { getJson, invalidate } from "./fetcher";
 import { summarize, type RealizedSummary, type VerifiedTrade } from "./portfolio";
 import { useDemo } from "./store";
 
@@ -82,6 +83,10 @@ export interface ChainPortfolioState {
 
 export const usdc = (atoms: string): number => Number(BigInt(atoms)) / 1_000_000;
 
+/** One URL for the wallet's history, so every reader of it shares a request. */
+export const WALLET_TRADES = (wallet: string): string =>
+  `/api/trades?wallet=${wallet}&limit=100`;
+
 const Ctx = createContext<ChainPortfolioState | null>(null);
 
 function useChainPortfolioValue(): ChainPortfolioState {
@@ -95,17 +100,23 @@ function useChainPortfolioValue(): ChainPortfolioState {
   const reload = useCallback(async (): Promise<void> => {
     if (!walletAddress) return;
     const wallet = encodeURIComponent(walletAddress);
+    // A reload is asked for after a trade, so the cached copies are stale by
+    // definition.
+    invalidate("/api/portfolio");
+    invalidate("/api/trades");
     setLoading(true);
     try {
-      const [chain, history] = await Promise.all([
-        fetch(`/api/portfolio?wallet=${wallet}`, { cache: "no-store" }),
-        fetch(`/api/trades?wallet=${wallet}&limit=100`, { cache: "no-store" }),
+      // The same history URL the trade-history panel asks for, so the two
+      // share one request instead of each fetching the wallet's trades.
+      const [body, history] = await Promise.all([
+        getJson<PortfolioSnapshot>(`/api/portfolio?wallet=${wallet}`),
+        getJson<{ trades: VerifiedTrade[] }>(WALLET_TRADES(wallet), { freshMs: 2_000 }).catch(
+          // History is supporting detail: losing it must not blank balances.
+          () => ({ trades: [] as VerifiedTrade[] }),
+        ),
       ]);
-      const body = (await chain.json()) as PortfolioSnapshot & { error?: string };
-      if (!chain.ok) throw new Error(body.error ?? "The portfolio read failed");
       setSnapshot(body);
-      // History is supporting detail: losing it must not blank the balances.
-      setTrades(history.ok ? ((await history.json()) as { trades: VerifiedTrade[] }).trades : []);
+      setTrades(history.trades);
       setError("");
     } finally {
       setLoading(false);
