@@ -88,6 +88,8 @@ export function TradeHistory({
   signedIn: boolean;
 }) {
   const [trades, setTrades] = useState<StoredTrade[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onlyThisMarket, setOnlyThisMarket] = useState(false);
   const [action, setAction] = useState<ActionFilter>("all");
@@ -101,14 +103,19 @@ export function TradeHistory({
       return;
     }
     const controller = new AbortController();
-    void fetch(`/api/trades?wallet=${encodeURIComponent(wallet)}&limit=100`, {
+    void fetch(`/api/trades?wallet=${encodeURIComponent(wallet)}&limit=60`, {
       cache: "no-store",
       signal: controller.signal,
     })
       .then(async (response) => {
-        const body = (await response.json()) as { trades?: StoredTrade[]; error?: string };
+        const body = (await response.json()) as {
+          trades?: StoredTrade[];
+          nextCursor?: string | null;
+          error?: string;
+        };
         if (!response.ok) throw new Error(body.error ?? "History is unavailable");
         setTrades(body.trades ?? []);
+        setCursor(body.nextCursor ?? null);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -118,6 +125,32 @@ export function TradeHistory({
       });
     return () => controller.abort();
   }, [signedIn, wallet]);
+
+  /**
+   * Fetch the next page.
+   *
+   * Cursor paging, not offset: rows arrive at the top of this ordering while
+   * somebody is reading, and an offset page would skip or repeat around them.
+   * Pages are appended, so the CSV export covers everything loaded.
+   */
+  const loadOlder = (): void => {
+    if (!wallet || !cursor || loadingMore) return;
+    setLoadingMore(true);
+    void fetch(
+      `/api/trades?wallet=${encodeURIComponent(wallet)}&limit=60&before=${encodeURIComponent(cursor)}`,
+      { cache: "no-store" },
+    )
+      .then(async (response) => {
+        const body = (await response.json()) as {
+          trades?: StoredTrade[];
+          nextCursor?: string | null;
+        };
+        setTrades((current) => [...(current ?? []), ...(body.trades ?? [])]);
+        setCursor(body.nextCursor ?? null);
+      })
+      .catch(() => setCursor(null))
+      .finally(() => setLoadingMore(false));
+  };
 
   const rows = useMemo(() => {
     if (!trades) return [];
@@ -272,21 +305,35 @@ export function TradeHistory({
             </tbody>
           </table>
 
-          {pages > 1 && (
+          {(pages > 1 || cursor) && (
             <div className="history-pager">
-              <button type="button" className="closebtn" disabled={current === 0} onClick={() => setPage(current - 1)}>
+              <button
+                type="button"
+                className="closebtn"
+                disabled={current === 0}
+                onClick={() => setPage(current - 1)}
+              >
                 ← Newer
               </button>
               <span>
                 Page {current + 1} of {pages}
+                {cursor && " +"}
               </span>
               <button
                 type="button"
                 className="closebtn"
-                disabled={current >= pages - 1}
-                onClick={() => setPage(current + 1)}
+                disabled={loadingMore}
+                onClick={() => {
+                  // Past the last loaded page, fetch rather than stop.
+                  if (current >= pages - 1) loadOlder();
+                  else setPage(current + 1);
+                }}
               >
-                Older →
+                {loadingMore
+                  ? "Loading…"
+                  : current >= pages - 1 && cursor
+                    ? "Load older"
+                    : "Older →"}
               </button>
             </div>
           )}

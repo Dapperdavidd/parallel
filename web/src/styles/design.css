@@ -348,6 +348,19 @@ label{font-size:13px;color:var(--ink2)}
 .draw-confirm button.danger{border-color:rgba(229,72,77,.5);color:var(--dn)}
 .draw-confirm button.danger:hover{background:rgba(229,72,77,.12)}
 
+/* ---- portfolio: period control, statement, room-left bar ---------------- */
+.perf-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.perf-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 0 2px}
+
+.room{display:inline-flex;align-items:center;gap:7px;min-width:92px}
+.room-track{display:block;flex:1;height:4px;min-width:40px;border-radius:999px;
+  background:#ffffff14;overflow:hidden}
+.room-fill{display:block;height:100%;border-radius:999px}
+
+@media (max-width:860px){
+  .perf-controls{width:100%;justify-content:space-between}
+}
+
 @media (max-width:860px){
   .history-count{margin-left:0}
 }

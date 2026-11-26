@@ -176,6 +176,15 @@ export const calendarDay = (): Field<string> =>
     return day;
   };
 
+/** An ISO 8601 instant, used as a page cursor. */
+export const isoTimestamp = (): Field<string> =>
+  (value, name) => {
+    const text_ = text({ max: 40 })(value, name);
+    const parsed = Date.parse(text_);
+    if (Number.isNaN(parsed)) return bad(name, "must be an ISO timestamp");
+    return new Date(parsed).toISOString();
+  };
+
 export const optional = <T>(field: Field<T>): Field<T | undefined> =>
   (value, name) => (value === undefined || value === null || value === "" ? undefined : field(value, name));
 

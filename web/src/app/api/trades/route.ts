@@ -1,8 +1,17 @@
-import { recentTrades, recordTrade } from "@/lib/server/data";
+import { recordTrade, tradePage } from "@/lib/server/data";
 import { holdQuote } from "@/lib/server/quotes";
 import { CEILINGS, readJson, route } from "@/lib/server/request";
 import { ok } from "@/lib/server/respond";
-import { address, shape, signature, text } from "@/lib/server/validate";
+import {
+  address,
+  integer,
+  isoTimestamp,
+  optional,
+  shape,
+  signature,
+  text,
+  withDefault,
+} from "@/lib/server/validate";
 import { verifyTrade } from "@/lib/server/verify-trade";
 
 /**
@@ -19,28 +28,35 @@ export const dynamic = "force-dynamic";
 
 const MAX_PAGE = 100;
 
-export const GET = route("trades.read", { ceiling: CEILINGS.read, sameOrigin: false }, async ({ url }) => {
-  const wallet = url.searchParams.get("wallet");
-  if (wallet) {
-    // Parsed for its side effect: a malformed address should be a 400 rather
-    // than a silent empty page.
-    address()(wallet, "wallet");
-  }
-  const marketId = url.searchParams.get("marketId");
-  const limit = Math.min(
-    MAX_PAGE,
-    Math.max(1, Number(url.searchParams.get("limit") ?? 40) || 40),
-  );
+export const GET = route(
+  "trades.read",
+  { ceiling: CEILINGS.read, sameOrigin: false },
+  async ({ url }) => {
+    const wallet = optional(address())(url.searchParams.get("wallet") ?? undefined, "wallet");
+    const marketId = optional(text({ max: 16, pattern: /^USD\/[A-Z]{3}$/ }))(
+      url.searchParams.get("marketId") ?? undefined,
+      "marketId",
+    );
+    const before = optional(isoTimestamp())(url.searchParams.get("before") ?? undefined, "before");
+    const limit = withDefault(integer({ min: 1, max: MAX_PAGE }), 40)(
+      url.searchParams.get("limit") ?? undefined,
+      "limit",
+    );
 
-  // Filtering by wallet happens after the read, so widen the window first.
-  const rows = await recentTrades(marketId, wallet ? 200 : limit);
-  const filtered = wallet ? rows.filter((row) => row.wallet === wallet) : rows;
-  return ok(
-    { trades: filtered.slice(0, limit) },
-    // Public, and a few seconds stale is fine: the feed polls.
-    { "Cache-Control": "public, max-age=2, stale-while-revalidate=10" },
-  );
-});
+    // Filtered and paged in the database. This used to read the most recent
+    // two hundred trades globally and filter afterwards, so a wallet whose
+    // last trade was two hundred trades ago saw nothing at all.
+    const page = await tradePage({ wallet: wallet?.toBase58(), marketId, before, limit });
+
+    return ok(
+      page,
+      wallet
+        // One wallet's own history: never shared between callers.
+        ? { "Cache-Control": "private, no-store" }
+        : { "Cache-Control": "public, max-age=2, stale-while-revalidate=10" },
+    );
+  },
+);
 
 const body = shape({
   signature: signature(),

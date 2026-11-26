@@ -113,6 +113,119 @@ export function summarize(trades: VerifiedTrade[]): RealizedSummary {
 }
 
 /**
+ * What is still open, and what it was opened at.
+ *
+ * `summarize` already walks the opens FIFO to realise closes; this returns
+ * what that walk leaves behind — the unmatched opens, with the size-weighted
+ * price they were entered at. That is the cost basis, and it is the missing
+ * piece for every figure the portfolio could not show: unrealised P&L per
+ * position, the return on a position rather than on the account, and how far
+ * the mark has to move before the position is gone.
+ *
+ * A position opened before this store existed has no recorded open, so it
+ * reports no basis rather than a guessed one.
+ */
+export interface OpenLot {
+  marketId: string;
+  side: "long" | "short";
+  /** Notional still open, in tUSDC. */
+  sizeUsdc: number;
+  /** Size-weighted entry, in USD per contract — the engine's own scale. */
+  entryPrice: number;
+}
+
+export function openLots(trades: VerifiedTrade[]): Map<string, OpenLot> {
+  const ordered = [...trades].sort((a, b) => seconds(a.ts) - seconds(b.ts));
+  const queues = new Map<string, { sizeUsdc: number; price: number }[]>();
+
+  for (const trade of ordered) {
+    const key = `${trade.marketId}|${trade.side}`;
+    const queue = queues.get(key) ?? [];
+    if (trade.action === "open") {
+      queue.push({ sizeUsdc: trade.sizeUsdc, price: trade.price });
+      queues.set(key, queue);
+      continue;
+    }
+    if (trade.action !== "close" && trade.action !== "liquidation") continue;
+    let remaining = trade.sizeUsdc;
+    while (remaining > 1e-9 && queue.length > 0) {
+      const leg = queue[0]!;
+      const matched = Math.min(remaining, leg.sizeUsdc);
+      remaining -= matched;
+      leg.sizeUsdc -= matched;
+      if (leg.sizeUsdc <= 1e-9) queue.shift();
+    }
+    queues.set(key, queue);
+  }
+
+  const out = new Map<string, OpenLot>();
+  for (const [key, queue] of queues) {
+    const sizeUsdc = queue.reduce((total, leg) => total + leg.sizeUsdc, 0);
+    if (sizeUsdc <= 1e-9) continue;
+    const weighted = queue.reduce((total, leg) => total + leg.sizeUsdc * leg.price, 0);
+    const [marketId, side] = key.split("|") as [string, "long" | "short"];
+    out.set(key, { marketId, side, sizeUsdc, entryPrice: weighted / sizeUsdc });
+  }
+  return out;
+}
+
+/**
+ * How much room a position has left.
+ *
+ * `marginRatio` is equity against notional: at 5x leverage a fresh position
+ * starts near 20%, and nears zero as it loses. `liquidationGapPct` is how far
+ * the engine's price has to move against the position before its margin is
+ * gone — the figure a trader actually watches, and one no screen here showed.
+ *
+ * Approximate for the same reason as `approximateLiquidationPrice`: the
+ * engine's maintenance margin sits at an account offset this app does not
+ * read, and fees and funding bring the real point slightly nearer.
+ */
+export interface PositionRisk {
+  /** Equity over notional, as a percentage. Null without a notional. */
+  marginRatio: number | null;
+  /** Unrealised P&L on this position, in tUSDC. Null without a cost basis. */
+  unrealizedUsdc: number | null;
+  /** Return on the margin behind it, as a percentage. */
+  returnPct: number | null;
+  /** How far the engine price must move against it, as a percentage. */
+  liquidationGapPct: number | null;
+}
+
+export function positionRisk(input: {
+  /** Notional of the open position, in tUSDC. */
+  notionalUsdc: number;
+  /** Equity in the portfolio backing it, in tUSDC. */
+  equityUsdc: number;
+  side: "long" | "short";
+  /** Engine price now, USD per contract. */
+  markPrice: number;
+  /** Entry from the cost basis, USD per contract. Null when unrecorded. */
+  entryPrice: number | null;
+}): PositionRisk {
+  const { notionalUsdc, equityUsdc, side, markPrice, entryPrice } = input;
+  const marginRatio = notionalUsdc > 0 ? (equityUsdc / notionalUsdc) * 100 : null;
+
+  const unrealizedUsdc =
+    entryPrice !== null && entryPrice > 0 && markPrice > 0
+      ? pnlSign(side) * notionalUsdc * (markPrice / entryPrice - 1)
+      : null;
+
+  // Margin at risk is the equity standing behind this position, so the move
+  // it can absorb is that equity as a share of the notional.
+  const liquidationGapPct =
+    notionalUsdc > 0 && equityUsdc > 0 ? Math.min(100, (equityUsdc / notionalUsdc) * 100) : null;
+
+  const margin = marginRatio !== null && marginRatio > 0 ? (notionalUsdc * marginRatio) / 100 : null;
+  const returnPct =
+    unrealizedUsdc !== null && margin !== null && margin > 0
+      ? (unrealizedUsdc / margin) * 100
+      : null;
+
+  return { marginRatio, unrealizedUsdc, returnPct, liquidationGapPct };
+}
+
+/**
  * The familiar quote for a market, from the engine's USD-per-contract price.
  *
  * A contract is a bundle of local currency — 1,000 naira, say — so the price

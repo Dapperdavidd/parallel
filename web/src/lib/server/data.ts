@@ -340,26 +340,87 @@ export interface Trade {
   ts: string;
 }
 
-export async function recentTrades(marketId: string | null, limit = 40): Promise<Trade[]> {
+/** What a trade page was asked for. */
+export interface TradeQuery {
+  marketId?: string | null;
+  /** The wallet whose history this is. Filtered in the database, not after. */
+  wallet?: string | null;
+  /** Only trades strictly older than this ISO timestamp — the page cursor. */
+  before?: string | null;
+  limit?: number;
+}
+
+export interface TradePage {
+  trades: Trade[];
+  /** Pass back as `before` for the next page. Null when this is the last. */
+  nextCursor: string | null;
+}
+
+const rowToTrade = (t: Record<string, unknown>): Trade => ({
+  marketId: t.market_id as string,
+  wallet: t.wallet as string,
+  side: t.side as Trade["side"],
+  action: t.action as string,
+  sizeUsdc: t.size_usdc as number,
+  leverage: t.leverage as number,
+  price: t.price as number,
+  txSignature: t.tx_signature as string,
+  ts: t.ts as string,
+});
+
+/**
+ * A page of trades, newest first.
+ *
+ * The wallet filter has to happen in the query. `/api/trades?wallet=…` used
+ * to read the most recent two hundred trades *globally* and filter them
+ * afterwards, so a wallet whose last trade was two hundred trades ago saw an
+ * empty history and no explanation. The `trades_wallet_ts_idx` index exists
+ * for exactly this.
+ *
+ * Paging is by cursor rather than offset: new rows arrive at the top of this
+ * ordering constantly, and an offset page would skip or repeat rows as they
+ * do. One extra row is read to decide whether there is another page, which is
+ * cheaper and more truthful than a count.
+ */
+export async function tradePage(query: TradeQuery): Promise<TradePage> {
+  const limit = Math.min(200, Math.max(1, query.limit ?? 40));
   const client = db();
+
   if (client) {
-    let q = client.from("trades").select("*").order("ts", { ascending: false }).limit(limit);
-    if (marketId) q = q.eq("market_id", marketId);
-    return must(await q, "read trades").map((t) => ({
-      marketId: t.market_id,
-      wallet: t.wallet,
-      side: t.side,
-      action: t.action,
-      sizeUsdc: t.size_usdc,
-      leverage: t.leverage,
-      price: t.price,
-      txSignature: t.tx_signature,
-      ts: t.ts,
-    }));
+    let q = client
+      .from("trades")
+      .select("*")
+      .order("ts", { ascending: false })
+      .limit(limit + 1);
+    if (query.marketId) q = q.eq("market_id", query.marketId);
+    if (query.wallet) q = q.eq("wallet", query.wallet);
+    if (query.before) q = q.lt("ts", query.before);
+    const rows = must(await q, "read trades").map(rowToTrade);
+    const trades = rows.slice(0, limit);
+    return {
+      trades,
+      nextCursor: rows.length > limit ? (trades[trades.length - 1]?.ts ?? null) : null,
+    };
   }
+
+  // The file store has no index, so it filters in memory — correct, and fine
+  // for a developer's machine where the file holds a few hundred lines.
   const all = await readLines<Trade>(join(DATA_DIR, "trades.jsonl"));
-  const filtered = marketId ? all.filter((t) => t.marketId === marketId) : all;
-  return filtered.slice(Math.max(0, filtered.length - limit)).reverse();
+  const filtered = all
+    .filter((t) => (query.marketId ? t.marketId === query.marketId : true))
+    .filter((t) => (query.wallet ? t.wallet === query.wallet : true))
+    .filter((t) => (query.before ? t.ts < query.before : true))
+    .sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
+  const trades = filtered.slice(0, limit);
+  return {
+    trades,
+    nextCursor: filtered.length > limit ? (trades[trades.length - 1]?.ts ?? null) : null,
+  };
+}
+
+/** The market-wide feed, which has no wallet and needs no cursor. */
+export async function recentTrades(marketId: string | null, limit = 40): Promise<Trade[]> {
+  return (await tradePage({ marketId, limit })).trades;
 }
 
 /** Persist a chain-verified trade, idempotently by transaction signature. */

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { compactUsd, fmt } from "@/lib/mock";
-import { localQuote } from "@/lib/portfolio";
+import { localQuote, openLots, positionRisk } from "@/lib/portfolio";
+import { buildStatement, downloadStatement } from "@/lib/statement";
+import { explorerAddress } from "@/lib/explorer";
 import { useDemo } from "@/lib/store";
 import { useChainPortfolio, usdc, type ChainPortfolio } from "@/lib/useChainPortfolio";
 import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
@@ -69,6 +71,15 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub?:
 const TABS = ["Positions", "Balances", "Account"] as const;
 type Tab = (typeof TABS)[number];
 
+/** How far back the realised curve looks. */
+const PERIODS = [
+  { key: "7d", label: "7D", days: 7 },
+  { key: "30d", label: "30D", days: 30 },
+  { key: "90d", label: "90D", days: 90 },
+  { key: "all", label: "All", days: null },
+] as const;
+type Period = (typeof PERIODS)[number]["key"];
+
 export default function PortfolioPage() {
   const { signedIn, user, walletAddress, ready, topUp, signOut } = useDemo();
   const { close } = usePercolatorTrade();
@@ -77,6 +88,7 @@ export default function PortfolioPage() {
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<Tab>("Positions");
   const [closing, setClosing] = useState("");
+  const [period, setPeriod] = useState<Period>("all");
 
   const {
     snapshot,
@@ -93,6 +105,34 @@ export default function PortfolioPage() {
   } = useChainPortfolio();
 
   const up = summary.realized >= 0;
+
+  /**
+   * The cost basis behind each open position.
+   *
+   * Keyed market|side, from the verified history, so the unrealised figure
+   * beside a position is computed against what that position was actually
+   * entered at rather than against the account's stored total.
+   */
+  const lots = useMemo(() => openLots(trades ?? []), [trades]);
+
+  // The curve, cut to the chosen window. The first point is pinned to the
+  // window's start value so a 7-day view does not open at zero and imply a
+  // loss that was realised before it.
+  const curve = useMemo(() => {
+    const days = PERIODS.find((entry) => entry.key === period)?.days ?? null;
+    if (days === null || summary.curve.length === 0) return summary.curve;
+    const cutoff = Math.floor((Date.now() - days * 86_400_000) / 1000);
+    const inside = summary.curve.filter((point) => point.time >= cutoff);
+    if (inside.length === 0) return [];
+    const before = summary.curve.filter((point) => point.time < cutoff).pop();
+    return before ? [{ time: cutoff, value: before.value }, ...inside] : inside;
+  }, [summary.curve, period]);
+
+  // Realised inside the window, which is the number the period control
+  // implies and not the lifetime total.
+  const realizedInPeriod =
+    curve.length > 0 ? curve[curve.length - 1]!.value - curve[0]!.value : 0;
+  const periodUp = realizedInPeriod >= 0;
 
   const onClose = useCallback(
     (portfolio: ChainPortfolio): void => {
@@ -206,20 +246,38 @@ export default function PortfolioPage() {
         <div className="perf-top">
           <div>
             <div className="ptile-label">Realised performance</div>
-            <div className="perf-pnl mono" style={{ color: up ? "var(--up)" : "var(--dn)" }}>
-              {trades ? `${up ? "+" : "−"}${fmt(Math.abs(summary.realized))}` : "—"}
+            <div className="perf-pnl mono" style={{ color: periodUp ? "var(--up)" : "var(--dn)" }}>
+              {trades
+                ? `${periodUp ? "+" : "−"}${fmt(Math.abs(period === "all" ? summary.realized : realizedInPeriod))}`
+                : "—"}
               <span className="perf-pct">
-                {summary.closes} {summary.closes === 1 ? "close" : "closes"}
+                {period === "all"
+                  ? `${summary.closes} ${summary.closes === 1 ? "close" : "closes"}`
+                  : `over ${PERIODS.find((entry) => entry.key === period)?.label.toLowerCase()}`}
               </span>
             </div>
           </div>
-          <div className="ptile-label mono">
-            {snapshot ? `slot ${snapshot.slot.toLocaleString()}` : "reading…"}
+          <div className="perf-controls">
+            <div className="lev-presets" role="group" aria-label="Period">
+              {PERIODS.map((entry) => (
+                <button
+                  key={entry.key}
+                  type="button"
+                  className={period === entry.key ? "on" : undefined}
+                  onClick={() => setPeriod(entry.key)}
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+            <div className="ptile-label mono">
+              {snapshot ? `slot ${snapshot.slot.toLocaleString()}` : "reading…"}
+            </div>
           </div>
         </div>
 
-        {summary.curve.length >= 2 ? (
-          <EquityChart data={summary.curve} up={up} />
+        {curve.length >= 2 ? (
+          <EquityChart data={curve} up={periodUp} />
         ) : (
           <div
             className="eq-host"
@@ -232,7 +290,9 @@ export default function PortfolioPage() {
               padding: "0 20px",
             }}
           >
-            Your curve starts at your first settled close. Nothing is drawn before then.
+            {summary.curve.length >= 2
+              ? "Nothing was realised in this window."
+              : "Your curve starts at your first settled close. Nothing is drawn before then."}
           </div>
         )}
 
@@ -260,6 +320,43 @@ export default function PortfolioPage() {
             value={fmt(0)}
             sub="No trading fee on devnet"
           />
+          <Tile
+            label="Funding paid"
+            value={fmt(0)}
+            sub="The devnet program accrues none"
+          />
+        </div>
+
+        {/* A trading record somebody cannot take away is not much of a
+            record. CSV on purpose: it opens anywhere and carries no
+            formatting that could misrepresent the numbers. */}
+        <div className="perf-foot">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ height: 32, fontSize: 12.5 }}
+            disabled={!snapshot}
+            onClick={() => {
+              downloadStatement(
+                buildStatement({
+                  snapshot,
+                  trades: trades ?? [],
+                  summary,
+                  walletBalance,
+                  portfolioEquity,
+                  equity,
+                  unrealized,
+                }),
+                walletAddress || "wallet",
+              );
+              toast("Statement downloaded");
+            }}
+          >
+            Download statement (CSV)
+          </button>
+          <span style={{ fontSize: 12, color: "var(--ink3)" }}>
+            Balances, open positions and every verified trade, with its signature.
+          </span>
         </div>
       </section>
 
@@ -293,25 +390,97 @@ export default function PortfolioPage() {
                     <th>Market</th>
                     <th>Side</th>
                     <th>Notional</th>
+                    <th>Entry</th>
                     <th>Mark</th>
-                    <th>Portfolio</th>
+                    <th>Unrealised</th>
+                    <th>Margin</th>
+                    <th>Room left</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
                   {positions.map(({ portfolio, position }) => {
                     const quote = localQuote(portfolio.unit, portfolio.effectivePriceE6);
+                    const notional = usdc(position.notionalAtoms);
+                    const lot = lots.get(`${portfolio.marketId}|${position.side}`);
+                    const markPrice = Number(BigInt(portfolio.effectivePriceE6)) / 1e6;
+                    const risk = positionRisk({
+                      notionalUsdc: notional,
+                      equityUsdc: usdc(portfolio.equityAtoms),
+                      side: position.side,
+                      markPrice,
+                      entryPrice: lot?.entryPrice ?? null,
+                    });
+                    const entryQuote =
+                      lot && lot.entryPrice > 0 ? portfolio.unit / lot.entryPrice : null;
                     return (
                       <tr key={`${portfolio.address}-${position.sizeQ}`}>
                         <td>{portfolio.marketId}</td>
                         <td style={{ color: position.side === "long" ? "var(--up)" : "var(--dn)" }}>
                           {position.side === "long" ? "Long" : "Short"}
                         </td>
-                        <td className="mono">{fmt(usdc(position.notionalAtoms))} tUSDC</td>
+                        <td className="mono">{fmt(notional)} tUSDC</td>
+                        {/* From the verified history. A position opened before
+                            the store existed has none, and shows a dash. */}
+                        <td
+                          className="mono"
+                          title={
+                            entryQuote === null
+                              ? "No recorded open for this position, so there is no cost basis to show."
+                              : "Size-weighted entry from your verified trades."
+                          }
+                        >
+                          {entryQuote === null ? "—" : entryQuote.toFixed(2)}
+                        </td>
                         <td className="mono">
                           {quote === null ? "—" : `${quote.toFixed(2)} ${portfolio.code}`}
                         </td>
-                        <td className="mono">{short(portfolio.address)}</td>
+                        <td
+                          className="mono"
+                          style={
+                            risk.unrealizedUsdc === null
+                              ? undefined
+                              : { color: risk.unrealizedUsdc >= 0 ? "var(--up)" : "var(--dn)" }
+                          }
+                        >
+                          {risk.unrealizedUsdc === null
+                            ? "—"
+                            : `${risk.unrealizedUsdc >= 0 ? "+" : "−"}${fmt(Math.abs(risk.unrealizedUsdc))}`}
+                          {risk.returnPct !== null && (
+                            <small style={{ marginLeft: 5, color: "var(--ink3)" }}>
+                              {risk.returnPct >= 0 ? "+" : "−"}
+                              {Math.abs(risk.returnPct).toFixed(1)}%
+                            </small>
+                          )}
+                        </td>
+                        <td className="mono">
+                          {risk.marginRatio === null ? "—" : `${risk.marginRatio.toFixed(1)}%`}
+                        </td>
+                        {/* How far the engine price can move against this
+                            position before its margin is gone. Approximate. */}
+                        <td title="How far the engine's price can move against this position before its margin is gone. Approximate: before fees and funding.">
+                          {risk.liquidationGapPct === null ? (
+                            "—"
+                          ) : (
+                            <span className="room">
+                              <span className="room-track">
+                                <span
+                                  className="room-fill"
+                                  style={{
+                                    width: `${Math.max(2, Math.min(100, risk.liquidationGapPct * 2))}%`,
+                                    background:
+                                      risk.liquidationGapPct < 8
+                                        ? "var(--dn)"
+                                        : risk.liquidationGapPct < 15
+                                          ? "var(--amb)"
+                                          : "var(--up)",
+                                  }}
+                                />
+                              </span>
+                              <b className="mono">{risk.liquidationGapPct.toFixed(1)}%</b>
+                            </span>
+                          )}
+                        </td>
                         <td>
                           <button
                             type="button"
@@ -362,6 +531,21 @@ export default function PortfolioPage() {
               <div className="row">
                 On-chain portfolios<b>{snapshot?.portfolios.length ?? "—"}</b>
               </div>
+              {(snapshot?.portfolios ?? []).map((portfolio) => (
+                <div className="row" key={portfolio.address}>
+                  {portfolio.marketId}
+                  <b className="mono">
+                    <a
+                      href={explorerAddress(portfolio.address)}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: "inherit" }}
+                    >
+                      {short(portfolio.address)} ↗
+                    </a>
+                  </b>
+                </div>
+              ))}
               <div className="row">
                 Read at slot<b className="mono">{snapshot ? snapshot.slot.toLocaleString() : "—"}</b>
               </div>
