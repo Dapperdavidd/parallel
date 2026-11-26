@@ -158,7 +158,7 @@ const AUDIT = String.raw`(() => {
   // enlarging it would break the line. So a link whose parent is running prose
   // is not a finding; a control is.
   if (window.innerWidth < 900) {
-    const inlineParents = new Set(["P", "LI", "SPAN", "TD", "SMALL", "LABEL", "H1", "H2", "H3"]);
+    const inlineParents = new Set(["P", "LI", "SPAN", "TD", "SMALL", "LABEL", "DD", "DT", "BLOCKQUOTE", "FIGCAPTION", "CAPTION", "H1", "H2", "H3"]);
     for (const el of document.querySelectorAll('button, a[href], [role="button"]')) {
       if (!visible(el)) continue;
       // Hidden until focused, by design.

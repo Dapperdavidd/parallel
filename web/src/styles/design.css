@@ -366,6 +366,65 @@ label{font-size:13px;color:var(--ink2)}
 /* The chart is focusable now, so it needs somewhere for the ring to sit. */
 .chart-host:focus-visible{outline-offset:-2px}
 
+/* ---- hedge mode: coverage, due dates, assumptions ---------------------- */
+.hedge-due{display:grid;gap:8px;margin-bottom:18px;padding:14px 16px;border-radius:12px;
+  background:rgba(242,169,59,.09);border:1px solid rgba(242,169,59,.3)}
+.hedge-due b{font-size:14px;font-weight:600;color:var(--amb)}
+.hedge-due ul{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.hedge-due li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-size:13.5px;color:var(--ink2)}
+.hedge-due li b{color:var(--ink);font-size:13.5px}
+.hedge-due > span{font-size:12.5px;color:var(--ink3);line-height:1.5}
+
+.hedge-cover{display:block;height:4px;border-radius:999px;background:#ffffff14;overflow:hidden}
+.hedge-cover span{display:block;height:100%;border-radius:999px;background:var(--up)}
+
+.hedge-gap{display:flex;gap:9px;align-items:flex-start;font-size:13px;cursor:pointer;
+  color:var(--ink2)}
+.hedge-gap input{margin-top:3px;flex:0 0 auto}
+.hedge-gap small{display:block;font-size:12px;color:var(--ink3);line-height:1.5;margin-top:2px}
+
+.hedge-assumptions{margin-top:18px;border:1px solid var(--ln);border-radius:12px;
+  padding:12px 16px;background:#ffffff04}
+.hedge-assumptions summary{cursor:pointer;font-size:13.5px;color:var(--ink2);
+  min-height:24px;display:flex;align-items:center}
+.hedge-assumptions summary:hover{color:var(--ink)}
+.hedge-assumptions ul{margin:10px 0 2px;padding-left:20px;display:grid;gap:8px}
+.hedge-assumptions li{font-size:13px;color:var(--ink3);line-height:1.6}
+.hedge-assumptions li b{color:var(--ink2);font-weight:500}
+
+/* ---- sign-in: failure, and what a wallet actually is ------------------- */
+.auth-error{display:grid;gap:7px;padding:12px 14px;border-radius:10px;
+  background:rgba(229,72,77,.10);border:1px solid rgba(229,72,77,.30)}
+.auth-error b{font-size:13.5px;color:var(--dn)}
+.auth-error span{font-size:13px;color:var(--ink2);line-height:1.5}
+.auth-error button{justify-self:start}
+
+.auth-custody{border:1px solid var(--ln);border-radius:12px;padding:12px 16px;
+  background:#ffffff04}
+.auth-custody summary{cursor:pointer;font-size:13.5px;color:var(--ink2);
+  min-height:24px;display:flex;align-items:center}
+.auth-custody summary:hover{color:var(--ink)}
+.auth-custody dl{margin:12px 0 2px}
+.auth-custody dt{font-size:12.5px;font-weight:600;color:var(--ink);margin-top:12px}
+.auth-custody dt:first-child{margin-top:0}
+.auth-custody dd{margin:4px 0 0;font-size:12.5px;color:var(--ink3);line-height:1.6}
+.auth-custody dd a{color:var(--pri-t);text-decoration:underline;text-underline-offset:2px}
+
+/* A banner the app can put above everything, for a state that blocks use. */
+.app-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:9px 18px;font-size:13px;color:var(--amb);
+  background:rgba(242,169,59,.10);border-bottom:1px solid rgba(242,169,59,.28)}
+.app-banner span{flex:1;min-width:220px;line-height:1.5}
+
+/* ---- taking the wallet away -------------------------------------------- */
+.pexport{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;padding:14px 16px;border:1px solid var(--ln);border-radius:12px;
+  background:#ffffff04}
+.pexport > div{display:grid;gap:5px;max-width:52ch}
+.pexport b{font-size:13.5px;font-weight:500}
+.pexport span{font-size:12.5px;color:var(--ink3);line-height:1.6}
+
 @media (max-width:860px){
   /* The key hints are for a keyboard, and a phone has none. */
   .chart-keys{display:none}

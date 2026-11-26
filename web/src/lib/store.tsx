@@ -35,6 +35,13 @@ const INITIAL: DemoState = {
 interface Store extends DemoState {
   ready: boolean;
   walletAddress: string;
+  /** What went wrong signing in, if anything. Cleared by trying again. */
+  authError: string;
+  /** True between asking to sign in and either a wallet or a failure. */
+  signingIn: boolean;
+  /** Why the automatic devnet top-up did not happen, if it did not. */
+  fundingError: string;
+  retryFunding: () => void;
   setMarket: (c: string) => void;
   signIn: (user?: string) => void;
   signOut: () => void;
@@ -58,6 +65,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const { signMessage } = useSignMessage();
   const [s, setS] = useState<DemoState>(INITIAL);
   const [hydrated, setHydrated] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
+  const [fundingError, setFundingError] = useState("");
   const walletAddress = wallets[0]?.address ?? "";
 
   // Hydrate after mount so the server and first client render match.
@@ -82,7 +92,36 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
   const setMarket = useCallback((market: string) => setS((p) => ({ ...p, market })), []);
 
-  const signIn = useCallback(() => void login(), [login]);
+  /**
+   * Sign in, and say so when it does not work.
+   *
+   * This was `void login()` — the promise's rejection was dropped on the
+   * floor, so a login that failed left the page exactly as it was, with no
+   * error and no way to tell whether anything had happened. A person in that
+   * position presses the button again, and again.
+   */
+  const signIn = useCallback(() => {
+    setAuthError("");
+    setSigningIn(true);
+    try {
+      const result = login() as unknown;
+      if (result instanceof Promise) {
+        void result
+          .catch((error: unknown) => {
+            // Closing the modal is a choice, not a failure.
+            const message = error instanceof Error ? error.message : String(error);
+            if (/exited|cancel|closed/i.test(message)) return;
+            setAuthError("Sign-in did not complete. Try again, or use a different email.");
+          })
+          .finally(() => setSigningIn(false));
+      } else {
+        setSigningIn(false);
+      }
+    } catch (error) {
+      setSigningIn(false);
+      setAuthError(error instanceof Error ? error.message : "Sign-in could not start");
+    }
+  }, [login]);
 
   const signOut = useCallback(() => {
     void logout();
@@ -145,8 +184,27 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     if (!authReady || !authenticated || !walletAddress) return;
     if (fundedRef.current === walletAddress) return;
     fundedRef.current = walletAddress;
-    void fundWallet().catch(() => undefined);
+    // A failed top-up is not fatal — the wallet exists and the person can ask
+    // again — but it must be visible, or they are left looking at a balance
+    // of zero with no idea why.
+    void fundWallet()
+      .then(() => setFundingError(""))
+      .catch((error: unknown) =>
+        setFundingError(
+          error instanceof Error ? error.message : "The devnet top-up did not go through",
+        ),
+      );
   }, [authReady, authenticated, walletAddress, fundWallet]);
+
+  const retryFunding = useCallback(() => {
+    fundedRef.current = "";
+    setFundingError("");
+    void fundWallet().catch((error: unknown) =>
+      setFundingError(
+        error instanceof Error ? error.message : "The devnet top-up did not go through",
+      ),
+    );
+  }, [fundWallet]);
 
   /** Add money through the idempotent devnet faucet. */
   const topUp = useCallback(async (): Promise<number> => fundWallet(), [fundWallet]);
@@ -162,12 +220,30 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       signedIn: authenticated,
       walletAddress,
       user: displayUser,
+      authError,
+      signingIn,
+      fundingError,
+      retryFunding,
       setMarket,
       signIn,
       signOut,
       topUp,
     }),
-    [s, ready, authenticated, walletAddress, displayUser, setMarket, signIn, signOut, topUp],
+    [
+      s,
+      ready,
+      authenticated,
+      walletAddress,
+      displayUser,
+      authError,
+      signingIn,
+      fundingError,
+      retryFunding,
+      setMarket,
+      signIn,
+      signOut,
+      topUp,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

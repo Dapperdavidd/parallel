@@ -18,7 +18,7 @@ const TABS = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { signedIn, user, topUp, ready } = useDemo();
+  const { signedIn, user, topUp, ready, fundingError, retryFunding } = useDemo();
   // The bar shows the wallet's real devnet balance, refreshed after a trade.
   const { walletBalance, snapshot, reload } = useChainPortfolio();
   const toast = useToast();
@@ -26,6 +26,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app">
+      {/* A top-up that failed is the difference between a usable account and
+          a balance of zero with no explanation. It used to be swallowed. */}
+      {signedIn && fundingError && (
+        <div className="app-banner" role="status">
+          <span>
+            Your devnet wallet could not be topped up. {fundingError}
+          </span>
+          <button type="button" className="closebtn" onClick={retryFunding}>
+            Try again
+          </button>
+        </div>
+      )}
       <div className="atop">
         {/* Inside the app the mark goes to the app's home, not the site. */}
         <Brand href="/app/trade" size={18} markSize={24} hideLabelOnSmall />

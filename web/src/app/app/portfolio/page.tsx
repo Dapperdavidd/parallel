@@ -9,6 +9,7 @@ import { explorerAddress } from "@/lib/explorer";
 import { useDemo } from "@/lib/store";
 import { useChainPortfolio, usdc, type ChainPortfolio } from "@/lib/useChainPortfolio";
 import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
+import { useExportWallet } from "@privy-io/react-auth/solana";
 import { useToast } from "@/components/Toast";
 import { EquityChart } from "@/components/EquityChart";
 
@@ -83,7 +84,9 @@ type Period = (typeof PERIODS)[number]["key"];
 export default function PortfolioPage() {
   const { signedIn, user, walletAddress, ready, topUp, signOut } = useDemo();
   const { close } = usePercolatorTrade();
+  const { exportWallet } = useExportWallet();
   const toast = useToast();
+  const [exporting, setExporting] = useState(false);
 
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<Tab>("Positions");
@@ -551,9 +554,43 @@ export default function PortfolioPage() {
               </div>
               <p>
                 Balances are devnet test tokens with no cash value. Every figure on this page is a
-                confirmed account read or a verified transaction — nothing here is simulated. Your
-                wallet is yours, and you can export it at any time.
+                confirmed account read or a verified transaction — nothing here is simulated.
               </p>
+
+              {/* The claim "your wallet is yours" was made on three screens
+                  and backed by nothing: there was no way to take the key out.
+                  Privy shows it on an iframe from its own domain, so neither
+                  this page nor anything on it can read what you are shown. */}
+              <div className="pexport">
+                <div>
+                  <b>Take your wallet with you</b>
+                  <span>
+                    Export the private key and import it into Phantom, Backpack or any Solana
+                    wallet. If Parallel stopped tomorrow, the wallet and everything in it would
+                    still be yours. Anyone holding this key controls the wallet — treat it the
+                    way you would treat cash.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ height: 38, fontSize: 13 }}
+                  disabled={exporting || !walletAddress}
+                  onClick={() => {
+                    setExporting(true);
+                    void exportWallet({ address: walletAddress })
+                      .catch((error: unknown) =>
+                        toast(
+                          error instanceof Error ? error.message : "The export did not open",
+                        ),
+                      )
+                      .finally(() => setExporting(false));
+                  }}
+                >
+                  {exporting ? "Opening…" : "Export private key"}
+                </button>
+              </div>
+
               <button
                 type="button"
                 className="btn btn-ghost"

@@ -49,7 +49,7 @@ function Check({ children, delay }: { children: React.ReactNode; delay: number }
 
 export default function SignInPage() {
   const router = useRouter();
-  const { signIn, signedIn, ready } = useDemo();
+  const { signIn, signedIn, ready, authError } = useDemo();
   const toast = useToast();
 
   const [step, setStep] = useState<Step>("start");
@@ -188,6 +188,16 @@ export default function SignInPage() {
                   Continue with email
                 </button>
               </form>
+              {authError && (
+                <div className="auth-error" role="alert">
+                  <b>That did not work</b>
+                  <span>{authError}</span>
+                  <button type="button" className="closebtn" onClick={() => signIn()}>
+                    Try again
+                  </button>
+                </div>
+              )}
+
               <div className="note">
                 <svg
                   width="18"
@@ -203,10 +213,55 @@ export default function SignInPage() {
                   <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
                 </svg>
                 <span>
-                  Your Solana wallet is linked to your Google or email. No seed phrase, no
-                  extension, no fees.
+                  Your Solana wallet is linked to your email. No seed phrase, no extension, no
+                  fees.
                 </span>
               </div>
+
+              {/* The four questions somebody sensible asks before letting an
+                  app make them a wallet. Answering them here, rather than in
+                  a documentation page they will not read first, is the
+                  difference between a wallet they trust and one they tolerate. */}
+              <details className="auth-custody">
+                <summary>Who holds this wallet, and what if I want to leave?</summary>
+                <dl>
+                  <dt>Who holds the key</dt>
+                  <dd>
+                    Privy&apos;s key-management service does — not us. We cannot spend from your
+                    wallet and we never see the key. Signing happens in your browser, against a
+                    key you control.
+                  </dd>
+
+                  <dt>How you get back in</dt>
+                  <dd>
+                    Through this same email. Keep access to it. There is no seed phrase to lose,
+                    which is the point — and it means the email <i>is</i> the recovery path.
+                  </dd>
+
+                  <dt>How you leave</dt>
+                  <dd>
+                    Export the private key from your portfolio screen at any time and import it
+                    into Phantom, Backpack or anything else. If Parallel disappeared tomorrow the
+                    wallet and everything in it would still be yours and still work. That is what
+                    makes this different from an account balance at a company.
+                  </dd>
+
+                  <dt>Who pays the network fees</dt>
+                  <dd>
+                    We do. Solana charges a fraction of a cent per transaction, and new wallets
+                    are topped up with enough devnet SOL to cover it, so you never have to hold a
+                    second token to use the first.
+                  </dd>
+
+                  <dt>What it is worth</dt>
+                  <dd>
+                    Nothing. These are Solana <b>devnet</b> test tokens with no cash value, and
+                    the {fmt(FAUCET_USDC_TARGET, 0)} tUSDC you start with is created by us, for
+                    free, for testing. Read the <Link href="/docs/risks">risks</Link> and the{" "}
+                    <Link href="/legal/privacy">privacy page</Link>.
+                  </dd>
+                </dl>
+              </details>
             </>
           )}
 

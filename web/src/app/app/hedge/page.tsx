@@ -56,8 +56,42 @@ export default function HedgePage() {
   const { walletBalance, reload } = useChainPortfolio();
 
   const m = useMarket(code);
-  const usd = m.px > 0 ? amount / m.px : 0;
+  const { positions } = useChainPortfolio();
+  const { close } = usePercolatorTrade();
+  const [closing, setClosing] = useState("");
+
+  /**
+   * What is already protected on this currency.
+   *
+   * The page used to suggest the full amount every time, ignoring hedges the
+   * person already holds — so hedging the same savings twice quietly left
+   * them double-covered, which is a position, not protection. Existing
+   * hedges on this market are summed and the suggestion is the **gap**.
+   */
+  const existing = useMemo(
+    () => hedges.filter((h) => h.marketId === `USD/${code}`),
+    [hedges, code],
+  );
+  const alreadyLocal = existing.reduce((total, h) => total + h.amountLocal, 0);
+  const alreadyUsd = existing.reduce((total, h) => total + h.amountUsd, 0);
+
+  const [coverGapOnly, setCoverGapOnly] = useState(true);
+  const uncoveredLocal = Math.max(0, amount - alreadyLocal);
+  const sizingLocal = coverGapOnly ? uncoveredLocal : amount;
+
+  const usd = m.px > 0 ? sizingLocal / m.px : 0;
+  const coveragePct = amount > 0 ? Math.min(100, (alreadyLocal / amount) * 100) : 0;
   const days = useMemo(() => daysUntil(date), [date]);
+
+  /** Hedges that need attention: due soon, or past their date. */
+  const attention = useMemo(
+    () =>
+      hedges
+        .map((h) => ({ ...h, days: daysUntil(h.dueDate) }))
+        .filter((h) => h.days <= 7)
+        .sort((a, b) => a.days - b.days),
+    [hedges],
+  );
 
   const load = useCallback(async (): Promise<void> => {
     if (!walletAddress) return;
@@ -81,12 +115,17 @@ export default function HedgePage() {
    * hedge against. (Quoting it as a move in the NGN-per-USD rate inverts the
    * sign and reads backwards to everyone who is not a trader.)
    */
-  const dollarsBefore = usd;
+  // The table models the whole holding, because that is what the person is
+  // asking about — not only the slice this new position would cover.
+  const dollarsBefore = m.px > 0 ? amount / m.px : 0;
+  const hedgedShare = amount > 0 ? Math.min(1, (alreadyLocal + sizingLocal) / amount) : 0;
   const outcomes = MOVES.map((pct) => {
     const dollarsAfter = dollarsBefore * (1 + pct / 100);
     const lossWithout = dollarsAfter - dollarsBefore;
-    // A 1x long USD position the same dollar size gains what the savings lose.
-    const hedgeGain = -lossWithout;
+    // A 1x long USD position gains what the savings lose, in proportion to
+    // how much of the holding it covers. Showing a perfect offset for a
+    // partial hedge would be the central lie this page could tell.
+    const hedgeGain = -lossWithout * hedgedShare;
     // Keep -0 out of the display.
     const z = (v: number): number => (Object.is(v, -0) || Math.abs(v) < 0.005 ? 0 : v);
     return {
@@ -100,12 +139,16 @@ export default function HedgePage() {
 
   const weakens = m.name.split(" ").slice(1).join(" ") || m.name;
   const blocked =
-    !m.live
+    !m.known
+      ? "Pick a currency we have a market for"
+      : !m.live
       ? "This market has no live price right now"
       : m.paused
         ? (m.reason ?? "This market is paused")
         : usd <= 0
-          ? "Enter the amount you hold"
+          ? alreadyLocal >= amount && amount > 0
+            ? "This amount is already fully hedged"
+            : "Enter the amount you hold"
           : walletBalance !== null && usd > walletBalance
             ? `Not enough tUSDC — you have ${fmt(walletBalance)}`
             : "";
@@ -120,7 +163,7 @@ export default function HedgePage() {
       return;
     }
     setBusy(true);
-    void hedge({ code: m.c, amountLocal: amount, marginUsdc: usd, dueDate: date })
+    void hedge({ code: m.c, amountLocal: sizingLocal, marginUsdc: usd, dueDate: date })
       .then(async ({ signature, recorded }) => {
         toast(
           recorded
@@ -133,6 +176,33 @@ export default function HedgePage() {
       .finally(() => setBusy(false));
   };
 
+  /**
+   * Close the position behind a hedge, from the page that opened it.
+   *
+   * "Close one from your portfolio at any time" was true and unhelpful: the
+   * person reading this screen is the one who wants to stop hedging, and
+   * sending them somewhere else to do it is the sort of small friction that
+   * leaves a position open.
+   */
+  const closeHedge = (marketId: string): void => {
+    const currency = marketId.split("/")[1] ?? "";
+    const held = positions.find((p) => p.portfolio.marketId === marketId);
+    if (!held) {
+      toast("There is no open position on that market — it may already be closed.");
+      return;
+    }
+    setClosing(marketId);
+    void close({ code: currency, portfolio: held.portfolio.address })
+      .then(async (signature) => {
+        toast(`Hedge closed · ${signature.slice(0, 8)}…`);
+        await load();
+      })
+      .catch((error: unknown) =>
+        toast(error instanceof Error ? error.message : "The close failed"),
+      )
+      .finally(() => setClosing(""));
+  };
+
   return (
     <div className="page" style={{ maxWidth: 820 }}>
       <span style={{ fontSize: 12, letterSpacing: ".1em", color: "var(--amb)" }}>HEDGE MODE</span>
@@ -143,6 +213,44 @@ export default function HedgePage() {
         Tell us what you hold and when you need it. We suggest one position that cancels out a
         fall in your currency. No forms, no bank.
       </p>
+
+      {/* Monitoring, such as it can be without sending anybody an email: a
+          hedge has a date it was needed by, and nothing used to say when that
+          date arrived. */}
+      {attention.length > 0 && (
+        <div className="hedge-due" role="status">
+          <b>
+            {attention.length === 1 ? "A hedge needs" : `${attention.length} hedges need`} your
+            attention
+          </b>
+          <ul>
+            {attention.map((h) => (
+              <li key={h.txSignature}>
+                {h.marketId} · {fmt(h.amountUsd)} tUSDC ·{" "}
+                {h.days === 0 ? (
+                  <b>due today</b>
+                ) : (
+                  <>
+                    due in <b>{h.days} {h.days === 1 ? "day" : "days"}</b>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className="closebtn"
+                  disabled={closing !== ""}
+                  onClick={() => closeHedge(h.marketId)}
+                >
+                  {closing === h.marketId ? "Closing…" : "Close it"}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <span>
+            A hedge does not expire by itself. Closing it returns the margin and ends the
+            protection.
+          </span>
+        </div>
+      )}
 
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))" }}>
         <div className="card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -204,6 +312,36 @@ export default function HedgePage() {
           <div className="row">
             You hold<b>{m.sym}{fmt(amount, 0)}</b>
           </div>
+          {alreadyLocal > 0 && (
+            <>
+              <div className="row">
+                Already hedged
+                <b>
+                  {m.sym}
+                  {fmt(alreadyLocal, 0)}{" "}
+                  <small style={{ color: "var(--ink3)" }}>{coveragePct.toFixed(0)}%</small>
+                </b>
+              </div>
+              <div className="hedge-cover" aria-hidden>
+                <span style={{ width: `${Math.max(2, coveragePct)}%` }} />
+              </div>
+              <label className="hedge-gap">
+                <input
+                  type="checkbox"
+                  checked={coverGapOnly}
+                  onChange={(event) => setCoverGapOnly(event.target.checked)}
+                />
+                <span>
+                  Only cover what is not hedged yet
+                  <small>
+                    {coverGapOnly
+                      ? `Sizing for the ${m.sym}${fmt(uncoveredLocal, 0)} still exposed.`
+                      : `Sizing for the full ${m.sym}${fmt(amount, 0)}, on top of ${fmt(alreadyUsd)} tUSDC already open.`}
+                  </small>
+                </span>
+              </label>
+            </>
+          )}
           <div className="row">
             Holding for<b>{days} days</b>
           </div>
@@ -241,6 +379,7 @@ export default function HedgePage() {
                   <th>Position</th>
                   <th>Needed by</th>
                   <th>Transaction</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -263,13 +402,24 @@ export default function HedgePage() {
                         {h.txSignature.slice(0, 8)}…
                       </a>
                     </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button
+                        type="button"
+                        className="closebtn"
+                        disabled={closing !== ""}
+                        onClick={() => closeHedge(h.marketId)}
+                      >
+                        {closing === h.marketId ? "Closing…" : "Close"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <p style={{ fontSize: 13, color: "var(--ink3)", marginTop: 10 }}>
-            Each row is a confirmed devnet position. Close one from your portfolio at any time.
+            Each row is a confirmed devnet position. Closing one here ends the protection and
+            returns its margin.
           </p>
         </>
       )}
@@ -310,9 +460,42 @@ export default function HedgePage() {
       </div>
       <p style={{ fontSize: 13, color: "var(--ink3)", marginTop: 12, lineHeight: 1.6 }}>
         A negative move means the {weakens} loses value against the dollar — the case you are
-        protecting against. The hedge is sized so the two columns cancel out. Devnet test funds
-        only.
+        protecting against.{" "}
+        {hedgedShare >= 0.999
+          ? "The hedge is sized so the two columns cancel out."
+          : `This covers ${(hedgedShare * 100).toFixed(0)}% of what you hold, so the columns offset by that much and no more.`}
       </p>
+
+      {/* The assumptions, where somebody deciding can see them. A table of
+          outcomes with no stated assumptions is a promise. */}
+      <details className="hedge-assumptions">
+        <summary>What this table assumes</summary>
+        <ul>
+          <li>
+            <b>The street rate, not a bank rate.</b> The price is Parallel&apos;s own index — the
+            median of the exchanges and peer-to-peer desks people actually transact at. Your bank
+            will quote something else, and the gap between them is currently{" "}
+            {m.off > 0 ? `${(((m.px / m.off) - 1) * 100).toFixed(1)}%` : "unknown"}.
+          </li>
+          <li>
+            <b>The position is marked against the engine, not the index.</b> The two sit close
+            together because the keeper pushes on a 0.1% move or every ten minutes, but they are
+            not identical, and a fill lands at the engine&apos;s price.
+          </li>
+          <li>
+            <b>A move happens and stays.</b> The table is the value at a single moment, not a
+            path. A currency that falls and recovers before your date leaves you roughly where
+            you started, minus costs.
+          </li>
+          <li>
+            <b>Costs are not in it.</b> No trading fee on devnet, and this deployment accrues no
+            funding — but a real venue would charge both, and both come out of the net column.
+          </li>
+          <li>
+            <b>Nothing here is money.</b> Devnet test tokens, no cash value.
+          </li>
+        </ul>
+      </details>
     </div>
   );
 }
