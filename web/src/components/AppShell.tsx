@@ -7,6 +7,7 @@ import { useDemo } from "@/lib/store";
 import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import { useToast } from "./Toast";
 import { SettingsMenu, LocaleMenu } from "./SettingsMenu";
+import { ConnectionBanner } from "./ConnectionBanner";
 import { fmt } from "@/lib/mock";
 
 const TABS = [
@@ -26,6 +27,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app">
+      <ConnectionBanner />
+
       {/* A top-up that failed is the difference between a usable account and
           a balance of zero with no explanation. It used to be swallowed. */}
       {signedIn && fundingError && (

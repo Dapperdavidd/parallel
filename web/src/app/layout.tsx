@@ -30,6 +30,15 @@ export const viewport: Viewport = {
   themeColor: "#0B0B0C",
   width: "device-width",
   initialScale: 1,
+  /**
+   * Draw under the notch and the home indicator, and pad around them in CSS.
+   *
+   * Without this the browser letterboxes the page and `env(safe-area-inset-*)`
+   * is always zero — so the bottom tab bar sat wherever the browser put it,
+   * and in landscape the content stopped short of the screen for no visible
+   * reason. With it, the insets are real and the rules in design.css use them.
+   */
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
