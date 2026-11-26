@@ -7,6 +7,7 @@
 
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { chromePath } from "./chrome.mjs";
 
 const args = process.argv.slice(2);
 const flags = args.filter((a) => a.startsWith("--"));
@@ -15,7 +16,7 @@ const [URL_, EXPR] = pos;
 const STATE = flags.find((f) => f.startsWith("--state="))?.slice(8);
 
 const PORT = 9226;
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = chromePath();
 
 const GPU = flags.includes("--gpu");
 const chrome = spawn(CHROME, [

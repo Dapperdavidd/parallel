@@ -12,15 +12,16 @@
 
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { chromePath, HEADLESS_FLAGS } from "./chrome.mjs";
 
 const [URL_, WIDTH = "1512"] = process.argv.slice(2);
 const PORT = 9234;
 
 const chrome = spawn(
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  chromePath(),
   [
-    "--headless=new", "--disable-gpu", "--hide-scrollbars",
-    `--remote-debugging-port=${PORT}`, "--no-first-run",
+    ...HEADLESS_FLAGS,
+    `--remote-debugging-port=${PORT}`,
     "--user-data-dir=/tmp/chrome-a11y", "about:blank",
   ],
   { stdio: "ignore" },

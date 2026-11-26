@@ -10,19 +10,16 @@
 
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { chromePath, HEADLESS_FLAGS } from "./chrome.mjs";
 
 const URL_ = process.argv[2] ?? "http://localhost:3000/";
 const WIDTH = Number(process.argv[3] ?? 414);
 const PORT = 9222;
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = chromePath();
 
 const chrome = spawn(CHROME, [
-  "--headless=new",
-  "--disable-gpu",
-  `--remote-debugging-port=${PORT}`,
-  "--no-first-run",
-  "--user-data-dir=/tmp/chrome-overflow-profile",
-  "about:blank",
+  ...HEADLESS_FLAGS,
+  `--remote-debugging-port=${PORT}`, "--user-data-dir=/tmp/chrome-overflow-profile", "about:blank",
 ], { stdio: "ignore" });
 
 const cleanup = () => { try { chrome.kill(); } catch { /* already gone */ } };

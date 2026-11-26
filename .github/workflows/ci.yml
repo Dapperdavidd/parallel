@@ -58,6 +58,53 @@ jobs:
           PARALLEL_ENV: development
         run: npm run build --prefix web
 
+  interface:
+    # The checks that only a real browser can make: accessibility, mobile
+    # layout, and what a page actually weighs. Each of these was fixed once by
+    # hand; without a gate they come back the next time a component is added.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install (services)
+        run: npm ci
+      - name: Install (web)
+        run: npm ci --prefix web
+
+      - name: Build
+        env:
+          PARALLEL_ENV: development
+        run: npm run build --prefix web
+
+      - name: Start
+        env:
+          PARALLEL_ENV: development
+          PARALLEL_APP_SECRET: ci-only-secret-at-least-thirty-two-chars
+        run: |
+          npm run start --prefix web &
+          # Wait for the server rather than sleeping a guessed number.
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/api/health > /dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:3000/api/health
+
+      - name: API smoke test
+        run: npm run smoke
+
+      - name: Interface checks
+        # Chrome is preinstalled on the GitHub runner image; scripts/chrome.mjs
+        # finds it, and adds --no-sandbox when CI is set.
+        run: npm run ui:check
+
   audit:
     runs-on: ubuntu-latest
     timeout-minutes: 10

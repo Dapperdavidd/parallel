@@ -6,10 +6,11 @@
 
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { chromePath } from "./chrome.mjs";
 
 const [, , URL_, SCROLL = "0", ...SELECTORS] = process.argv;
 const PORT = 9225;
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = chromePath();
 
 const chrome = spawn(CHROME, [
   "--headless=new", "--disable-gpu", "--hide-scrollbars",

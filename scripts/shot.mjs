@@ -12,6 +12,7 @@
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
+import { chromePath } from "./chrome.mjs";
 
 const args = process.argv.slice(2);
 const flags = args.filter((a) => a.startsWith("--"));
@@ -26,7 +27,7 @@ const MOBILE = WIDTH < 820;
 const TO = flags.find((f) => f.startsWith("--to="))?.slice(5);
 
 const PORT = 9223;
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = chromePath();
 
 // Never hang: a page with autoplaying video can keep Chrome busy, and a stuck
 // screenshot is worse than a missing one.

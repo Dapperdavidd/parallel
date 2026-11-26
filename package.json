@@ -33,7 +33,9 @@
     "test:all": "npm test && npm --prefix web test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "reconcile": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/services/reconcile.ts"
+    "reconcile": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/services/reconcile.ts",
+    "ui:check": "node scripts/ui-check.mjs",
+    "smoke": "node scripts/smoke-api.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",

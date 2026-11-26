@@ -6,6 +6,7 @@ import { fmt } from "@/lib/mock";
 import { latestTicks, listMarkets, registryMeta } from "@/lib/server/data";
 import { MARKETS } from "@/lib/mock";
 import { explorerTx } from "@/lib/explorer";
+import { AppLink } from "@/components/AppLink";
 
 export const metadata: Metadata = {
   title: "Open index — Parallel",
@@ -226,9 +227,9 @@ export default async function IndexPage() {
                     )}
                   </div>
 
-                  <Link href={`/app/trade?m=${m.currency}`} className="idx-link">
+                  <AppLink href={`/app/trade?m=${m.currency}`} className="idx-link">
                     Trade {m.id} →
-                  </Link>
+                  </AppLink>
                 </section>
               );
             })}
