@@ -5,98 +5,125 @@ Nigerian naira. Priced by Parallel's own open street-rate index, executed on the
 open-source [Percolator](https://github.com/aeyakovenko/percolator-prog) perps
 engine.
 
-> **Devnet only.** Mock USDC, no real money. Built for the Solana Foundation
-> Perps & Prediction Markets hackathon.
+> **Devnet only.** Test USDC, no real money, and no mainnet date. Built for the
+> Solana Foundation Perps & Prediction Markets hackathon.
 
-## Build order
+Most of the world's currencies trade at two prices: the official rate a bank
+will quote you, and the street rate people actually transact at. The gap is
+where the risk lives, and nobody can hedge it, because no venue prices the
+street rate. Parallel measures it from the exchanges and peer-to-peer desks
+that make it, publishes every reading, and makes it tradable.
 
-The product is built in three phases, in order. **This repo is currently in
-Phase 1.**
+**Thirteen markets** are live on devnet: NGN, ZAR, ARS, BRL, MXN, COP, TRY, INR,
+PHP, KES, GHS, EGP, PKR.
 
-1. **Feasibility scripts** ← *here* — TypeScript spikes that prove the engine,
-   the oracle push, trading, liquidation and the price index work on devnet.
-   No UI, no database, no API routes.
-2. **UI with mock data** — every screen, hard-coded sample data.
-3. **Functionality** — wire the screens to Percolator, the oracle and Supabase.
+## What is in this repository
+
+Two deployables that share a contract rather than code — the Supabase schema and
+the committed market registry.
+
+| | |
+| --- | --- |
+| `src/` | The services. The index keeper, the market and vault creation scripts, the liquidity signer, and the feasibility spikes. Runs beside the oracle key. |
+| `web/` | The app. Next.js 15, App Router, React 19. Reads the index, prepares trades, and is the only thing a trader sees. |
+| `market-registry.json` | Which Percolator market account is which currency. Committed, public, no secrets. |
+| `src/lib/store/schema.sql` | The Supabase schema. Apply it before pointing anything at a database. |
+| `docs/` | Architecture, the HTTP API, and how to run this in production. |
 
 ## Getting started
 
+Nothing below needs a key, a database or a deployment. With no configuration at
+all the app reads the JSON files under `data/`, signs with the keypairs in
+`wallets/`, and talks to public devnet.
+
 ```bash
-npm install
-npm run spike5              # street price index, all 13 markets
-npm run spike5 -- USD/NGN   # one market
-npm run typecheck
+npm install                 # the services
+npm install --prefix web    # the app
+
+npm run index               # measure the street index, all 13 markets, once
+npm run keeper -- --loop    # keep it measuring and push on-chain
+
+npm run dev --prefix web    # the app, on http://localhost:3000
 ```
 
-Spike 5 needs no keys and touches no chain — it is read-only HTTP against public
-price endpoints.
+Checks, which are also what CI runs:
+
+```bash
+npm run lint                # both packages, one config
+npm run typecheck           # services
+npm run typecheck --prefix web
+npm test                    # services
+npm test --prefix web
+node scripts/smoke-api.mjs  # the running API, end to end
+```
+
+## How a price becomes a trade
+
+1. **Measure.** The index service reads every source for a market — exchange
+   order books and peer-to-peer desks — drops anything more than 3% from the
+   median, and recomputes. Fewer than two live sources and the market pauses
+   rather than quoting a number we do not believe. (`src/lib/index-math.ts`)
+2. **Publish.** Every reading is stored, including the ones that failed and the
+   ones dropped as outliers, so anyone can recompute our number from the
+   `/open-index` page alone.
+3. **Push.** The keeper writes the median on-chain when it has moved more than
+   0.1% or ten minutes have passed, whichever comes first.
+   (`src/services/keeper.ts`)
+4. **Trade.** The app prepares a transaction against Percolator, priced at the
+   engine's own effective price, co-signed by that market's liquidity authority.
+   Parallel is the counterparty: there is no order book, because the engine
+   settles against an isolated vault. (`web/src/app/api/trade/prepare`)
+5. **Record.** A history row is written only when a signed server quote and a
+   confirmed devnet transaction agree on size, price, side and accounts.
+
+## What is deliberately not here
+
+Being clear about this is cheaper than being asked.
+
+- **No order book.** Percolator matches against a vault, so a book would be
+  invented liquidity. The trade screen shows the live trade feed in its place.
+- **No limit, trigger, stop-loss or reduce-only orders.** The deployed devnet
+  program cannot rest an order. The tabs are visible and disabled, and say why.
+- **No funding.** These markets were created with a funding cap, but the devnet
+  program does not accrue funding through its AuthMark price path — verified
+  on-chain, with the market's own counters at zero after a full liquidation
+  cycle. So the figure is zero and the screen says why rather than listing
+  plausible payments.
+- **No real money, and no mainnet date.** After the devnet beta has run
+  properly, the contracts have been audited, and the legal position is clear in
+  each country.
+
+## Documentation
+
+| | |
+| --- | --- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the pieces fit, and the two environment modes |
+| [docs/API.md](docs/API.md) | Every HTTP endpoint, its schema, its limits and its errors |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Running it: objectives, incidents, backups, deployment |
+| [CHANGELOG.md](CHANGELOG.md) | What changed, and when |
+| [PHASE-1-REPORT.md](PHASE-1-REPORT.md) | What the feasibility spikes proved on devnet |
+
+The product documentation a trader reads is in the app itself, under `/docs`.
 
 ## The spikes
 
-| # | Command | Proves | |
-|---|---|---|---|
-| 1 | `npm run spike1` | Mock USDC mint + a naira market with our wallet as oracle authority | ✅ |
-| 2 | `npm run spike2` | Oracle push, read-back, and the per-slot price cap | ✅ |
-| 3 | `npm run spike3` | Open a long and a short, crank, PnL, close both | ✅ |
-| 4 | `npm run spike4` | Liquidation of a high-leverage position | ✅ |
-| 5 | `npm run spike5` | Street price index with median / outlier / pause rules | ✅ |
-| 6 | `npm run spike6` | Oracle loop with the push-on-move rule | ✅ |
-| 7 | `npm run spike7` | Privy email wallet holds mock USDC and signs Percolator instructions | ✅ |
+The feasibility work that came first. Each one proves a thing on devnet rather
+than arguing it, and they still run.
 
-Useful alongside them:
+| # | Command | Proves |
+| --- | --- | --- |
+| 1 | `npm run spike1` | Test USDC mint and a naira market with our wallet as oracle authority |
+| 2 | `npm run spike2` | Oracle push, read-back, and the per-slot price cap |
+| 3 | `npm run spike3` | Open a long and a short, crank, P&L, close both |
+| 4 | `npm run spike4` | A position liquidates on an adverse mark |
+| 5 | `npm run spike5` | The street index, all 13 markets, read-only HTTP |
+| 6 | `npm run spike6` | The oracle loop at its real cadence |
+| 7 | `npm run spike7` | A browser wallet trading against it |
 
-```bash
-npm run inspect                  # live market, oracle profile and portfolios
-npm run spike6 -- --dry-run      # index loop without touching the chain
-npm run spike1 -- --fresh        # rebuild the market from scratch
-```
+`PHASE-1-REPORT.md` has the signatures.
 
-Spikes 1–4 and 6 touch devnet and need a funded wallet. Devnet's airdrop RPC is
-closed, so they print the exact `solana transfer` command if a wallet is short.
+## Licence and credit
 
-## Layout
-
-```
-src/
-  lib/            index service and (soon) the Percolator wrapper
-    markets.ts      market registry and unit sizes
-    sources.ts      one adapter per price venue
-    index-math.ts   median, outlier, pause and push rules
-    http.ts         timeout / retry / defensive parsing
-  spikes/         the Phase 1 feasibility scripts
-  vendor/
-    percolator-v16/  vendored upstream client library, see PROVENANCE.md
-wallets/          devnet keypairs — gitignored, never committed
-out/              run artifacts and probed API responses — gitignored
-reference/        upstream repos cloned for research — gitignored
-```
-
-## How prices are made
-
-Every market tracks the **street price of a digital dollar**: the median USDT
-price across several public venues per currency.
-
-1. Poll each street source every 2 minutes; the official rate once a day.
-2. Use the mid of best bid and best ask; for P2P books, the best offer.
-3. Drop any source more than 3% from the median, then recompute.
-4. A market needs at least 2 live sources, or it pauses — no new positions,
-   existing positions can still close.
-5. If the median strays more than 15% from the official rate, pause and alert.
-6. Push on-chain when the median moves more than 0.1%, or 10 minutes pass.
-7. Store every calculation with its per-source breakdown.
-
-Each market trades a **bundle** of local currency (1,000 NGN, 10 ZAR, …) chosen
-so the USD unit price lands in roughly $0.05–$10, where the engine's e6 price
-scale behaves well. The UI always shows the familiar quote (₦1,450 per $1).
-
-## A note on upstream documentation
-
-The Percolator CLI's `README.md` and `skill.md` describe a command-line interface
-and an ABI that **no longer exist** in that repo. Parallel drives the program by
-importing the v16 encoder/parser library directly and hand-building instructions,
-following upstream's own `tests/v16/devnet-smoke.ts`. See
-`src/vendor/percolator-v16/PROVENANCE.md`.
-
-## Licence
-
-Vendored Percolator code is Apache-2.0, copyright its original authors.
+Percolator is Anza's, and is vendored under `src/vendor/percolator-v16/` at the
+version deployed on devnet. Price sources are credited by name on the
+`/open-index` page, which is the point of that page.

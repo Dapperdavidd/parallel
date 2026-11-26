@@ -301,6 +301,24 @@ freshIdentity();
   });
   check("an unknown market is a 404", unknownMarket.status === 404, String(unknownMarket.status));
 
+  // Slippage applies only against a price the client says it showed. Without
+  // one there is nothing to compare against, and the engine's standing
+  // distance from the index is the basis, not slippage.
+  const noExpectation = await post("/api/trade/prepare", {
+    wallet: wallet.publicKey.toBase58(),
+    portfolio: portfolio.publicKey.toBase58(),
+    marketId: "USD/NGN",
+    side: "long",
+    marginUsdc: 100,
+    leverage: 2,
+    maxSlippageBps: 1,
+  });
+  check(
+    "a trade with no expected price is not refused for slippage",
+    noExpectation.status === 200,
+    `${noExpectation.status} ${JSON.stringify(await json(noExpectation)).slice(0, 140)}`,
+  );
+
   // A stale on-screen price must be refused rather than filled quietly.
   const stale = await post("/api/trade/prepare", {
     wallet: wallet.publicKey.toBase58(),

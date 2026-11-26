@@ -357,6 +357,47 @@ label{font-size:13px;color:var(--ink2)}
   background:#ffffff14;overflow:hidden}
 .room-fill{display:block;height:100%;border-radius:999px}
 
+/* ---- status page -------------------------------------------------------- */
+.sbanner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:30px;
+  padding:16px 20px;border-radius:12px;border:1px solid var(--ln);background:#ffffff04}
+.sbanner b{font-size:18px;font-weight:500}
+.sbanner .smeta{font-size:13px;color:var(--ink3)}
+.sbanner.is-up{border-color:rgba(46,189,133,.35);background:rgba(46,189,133,.07)}
+.sbanner.is-degraded{border-color:rgba(242,169,59,.35);background:rgba(242,169,59,.07)}
+.sbanner.is-down{border-color:rgba(229,72,77,.35);background:rgba(229,72,77,.07)}
+
+.sdot{width:9px;height:9px;border-radius:50%;background:var(--ink3);flex:0 0 auto;
+  display:inline-block;margin-right:8px}
+.sbanner .sdot{width:11px;height:11px;margin-right:0}
+.sdot.is-up,.is-up > .sdot{background:var(--up)}
+.sdot.is-degraded,.is-degraded > .sdot{background:var(--amb)}
+.sdot.is-down,.is-down > .sdot{background:var(--dn)}
+.sdot.is-wait,.is-wait > .sdot{background:var(--ink3)}
+
+.srow{display:grid;grid-template-columns:minmax(170px,1fr) minmax(130px,.7fr) minmax(0,2.4fr);
+  align-items:baseline;gap:18px;padding:16px 24px;border-top:1px solid var(--ln);font-size:14.5px}
+.srow:first-child{border-top:none}
+.srow b{font-weight:500;display:flex;align-items:center}
+.srow .swhy{color:var(--ink3);font-size:13.5px;line-height:1.55}
+
+@media (max-width:760px){
+  .srow{grid-template-columns:1fr;gap:5px;padding:14px 16px}
+}
+
+/* ---- legal pages -------------------------------------------------------- */
+.legal{max-width:70ch}
+.legal h2{font-size:21px;letter-spacing:-.02em;margin:38px 0 10px}
+.legal h3{font-size:16px;font-weight:600;margin:24px 0 6px}
+.legal p,.legal li{color:var(--ink2);font-size:15.5px;line-height:1.72}
+.legal ul{padding-left:20px;margin:8px 0}
+.legal li{margin-bottom:6px}
+.legal b{color:var(--ink);font-weight:500}
+.legal .updated{font-size:13px;color:var(--ink3)}
+.legal table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+.legal th,.legal td{text-align:left;padding:10px 12px;border-top:1px solid var(--ln);
+  vertical-align:top;color:var(--ink2)}
+.legal th{color:var(--ink);font-weight:500;width:34%}
+
 @media (max-width:860px){
   .perf-controls{width:100%;justify-content:space-between}
 }

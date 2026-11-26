@@ -112,11 +112,31 @@ export const POST = route("trade/prepare", { ceiling: CEILINGS.prepare }, async 
     market!.id,
   );
 
-  // Slippage is measured against what the trader was actually shown, when the
-  // client tells us. Without it, the index is the only reference we have.
-  const referenceE6 = input.expectedPriceE6 ?? tick!.unitPriceUsd! * 1e6;
-  const moveBps = Math.round((Number(risk.effectivePriceE6) / referenceE6 - 1) * 10_000);
-  if (Math.abs(moveBps) > input.maxSlippageBps) {
+  /**
+   * Slippage, and only slippage.
+   *
+   * It is measured against the price the trader was actually shown, which the
+   * client sends as `expectedPriceE6`. Where that is absent there is nothing
+   * to compare against and no gate is applied.
+   *
+   * The first version fell back to the index, and that was wrong in a way
+   * worth recording. Slippage is "the price moved while you were deciding".
+   * The engine's distance from the index is the **basis** — a standing
+   * property of a market whose keeper pushes on a 0.1% move or every ten
+   * minutes — and it can sit above 1% perfectly legitimately. Gating one on
+   * the other refused ordinary trades on NGN with a message claiming the
+   * price had just moved, which was simply untrue.
+   *
+   * The basis is reported in the quote instead, as `priceImpactBps`, and the
+   * ticket shows it before anybody commits. The only hard floor on it is
+   * `assertEnginePriceSane` above, which exists to catch a misread field
+   * rather than a stale push.
+   */
+  const moveBps =
+    input.expectedPriceE6 === undefined
+      ? 0
+      : Math.round((Number(risk.effectivePriceE6) / input.expectedPriceE6 - 1) * 10_000);
+  if (input.expectedPriceE6 !== undefined && Math.abs(moveBps) > input.maxSlippageBps) {
     reject(
       "conflict",
       `The price moved ${(Math.abs(moveBps) / 100).toFixed(2)}% while you were deciding. ` +
@@ -198,8 +218,13 @@ export const POST = route("trade/prepare", { ceiling: CEILINGS.prepare }, async 
       indexPrice: tick!.unitPriceUsd,
       /** Fill versus index, in basis points: positive means worse for a buyer. */
       priceImpactBps: impactBps,
-      /** How far the price moved between the screen and this quote. */
+      /**
+       * How far the price moved between the screen and this quote. Zero when
+       * the client did not say what it was showing — not "no movement", but
+       * "nothing to compare against".
+       */
       priceMoveBps: moveBps,
+      slippageChecked: input.expectedPriceE6 !== undefined,
       maxSlippageBps: input.maxSlippageBps,
       /** Approximate, before fees and funding — see `approximateLiquidationPrice`. */
       approximateLiquidationPrice: approximateLiquidationPrice(

@@ -20,7 +20,17 @@ import { ok } from "@/lib/server/respond";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CHECK_TIMEOUT_MS = 4_000;
+/**
+ * How long a dependency may take before readiness calls it down.
+ *
+ * Four seconds was too tight. The first Supabase call in a cold process spends
+ * about three on connection setup, so a perfectly healthy deployment reported
+ * "the index store did not answer" on its first probe — and a readiness check
+ * that cries wolf is worse than none, because the response is to stop reading
+ * it. Eight is comfortably past a cold start and still well inside the
+ * sixty-second interval an uptime check would use.
+ */
+const CHECK_TIMEOUT_MS = 8_000;
 
 interface Check {
   name: string;

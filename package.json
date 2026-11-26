@@ -32,7 +32,8 @@
     "test": "tsx --test \"test/**/*.test.ts\"",
     "test:all": "npm test && npm --prefix web test",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "reconcile": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/services/reconcile.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",

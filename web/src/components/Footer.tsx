@@ -61,6 +61,7 @@ export function Footer() {
             <Link href="/open-index">Open index</Link>
             <Link href="/vaults">Liquidity vaults</Link>
             <Link href="/docs/risks">Risk disclosure</Link>
+            <Link href="/status">System status</Link>
             <Link href="/signin">Sign in / Sign up</Link>
           </div>
         </div>
@@ -104,10 +105,11 @@ export function Footer() {
         }}
       >
         <span>© 2026 Parallel</span>
-        <span style={{ display: "flex", gap: 20 }}>
+        <span style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           <Link href="/docs/risks">Risk</Link>
-          <Link href="/app/markets">Markets</Link>
-          <Link href="/signin">Sign in</Link>
+          <Link href="/legal/terms">Terms</Link>
+          <Link href="/legal/privacy">Privacy</Link>
+          <Link href="/status">Status</Link>
         </span>
       </div>
       <div className="wordmark" aria-hidden="true">
