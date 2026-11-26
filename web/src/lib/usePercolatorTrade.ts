@@ -42,6 +42,21 @@ export interface TradeQuote {
   expiresInSeconds: number;
 }
 
+/**
+ * Where a trade has got to.
+ *
+ * The ticket used to show one spinner for the whole thing, so "Waiting for
+ * wallet…" stayed on screen while the transaction was already on devnet, and
+ * a failure gave no clue which step had failed. Each of these is a different
+ * problem with a different remedy, and the ticket says which one it is.
+ */
+export type TradeStage =
+  | "portfolio"
+  | "preparing"
+  | "wallet"
+  | "recording"
+  | "done";
+
 export interface OpenInput {
   code: string;
   side: "long" | "short";
@@ -50,6 +65,7 @@ export interface OpenInput {
   /** The price on screen, in micro-dollars per contract, if known. */
   expectedPriceE6?: number;
   maxSlippageBps?: number;
+  onStage?: (stage: TradeStage) => void;
 }
 
 interface MarketConfig {
@@ -171,7 +187,10 @@ function usePercolatorTradeValue() {
       const market = marketBody.markets.find((entry) => entry.code === input.code);
       if (!market || !marketBody.collateralMint) throw new Error("Market configuration is unavailable");
       if (!market.acceptingPositions) throw new Error("This market is paused");
+      input.onStage?.("portfolio");
       const portfolio = await ensurePortfolio(market, marketBody.collateralMint);
+
+      input.onStage?.("preparing");
 
       const prepared = await fetch("/api/trade/prepare", {
         method: "POST",
@@ -199,7 +218,9 @@ function usePercolatorTradeValue() {
       if (!prepared.ok || !body.transaction || !body.quoteToken) {
         throw new Error(body.error ?? "Trade preparation failed");
       }
+      input.onStage?.("wallet");
       const signature = await send(bytesFromBase64(body.transaction));
+      input.onStage?.("recording");
       // The quote is the server's own arithmetic, signed. History is written
       // from it, so nothing about this trade is recorded on our word for it.
       const recorded = await fetch("/api/trades", {
@@ -209,6 +230,7 @@ function usePercolatorTradeValue() {
       })
         .then((response) => response.ok)
         .catch(() => false);
+      input.onStage?.("done");
       return {
         signature,
         portfolio,
@@ -269,7 +291,7 @@ function usePercolatorTradeValue() {
   );
 
   const close = useCallback(
-    async (input: { code: string; portfolio?: string }) => {
+    async (input: { code: string; portfolio?: string; onStage?: (stage: TradeStage) => void }) => {
       const wallet = wallets[0];
       if (!wallet) throw new Error("Your Solana wallet is not ready");
       const marketResponse = await fetch("/api/markets", { cache: "no-store" });
@@ -284,6 +306,7 @@ function usePercolatorTradeValue() {
         input.portfolio ?? localStorage.getItem(`parallel.portfolio.${market.id}.${wallet.address}`);
       if (!portfolio) throw new Error("No on-chain portfolio was found for this market");
 
+      input.onStage?.("preparing");
       const prepared = await fetch("/api/trade/close/prepare", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -297,12 +320,15 @@ function usePercolatorTradeValue() {
       if (!prepared.ok || !body.transaction || !body.quoteToken) {
         throw new Error(body.error ?? "Close preparation failed");
       }
+      input.onStage?.("wallet");
       const signature = await send(bytesFromBase64(body.transaction));
+      input.onStage?.("recording");
       await fetch("/api/trades", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ signature, quoteToken: body.quoteToken }),
       }).catch(() => undefined);
+      input.onStage?.("done");
       return signature;
     },
     [wallets, send],

@@ -218,6 +218,7 @@ export function ChartDrawings({
   const [tool, setTool] = useState<Tool>("cursor");
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const [shown, setShown] = useState(true);
 
   // The frame loop and the DOM listeners read the live values from refs, so
@@ -618,6 +619,15 @@ export function ChartDrawings({
     };
   }, [wrap, locate, projection, commit, code, chart, series]);
 
+  /**
+   * Delete the selected drawing, or ask before clearing the lot.
+   *
+   * `window.confirm` blocks the whole page, cannot be styled, and on some
+   * mobile browsers offers "prevent this page from creating more dialogs",
+   * which would disable the only guard on a destructive action. The ask is
+   * now part of the toolbar: it appears in place, and anything else dismisses
+   * it.
+   */
   const clear = (): void => {
     if (selected) {
       commit(drawings.filter((d) => d.id !== selected));
@@ -625,14 +635,35 @@ export function ChartDrawings({
       return;
     }
     if (drawings.length === 0) return;
-    if (window.confirm(`Remove all ${drawings.length} drawings on USD/${code}?`)) {
-      commit([]);
-    }
+    setConfirmingClear(true);
   };
 
   return (
     <>
       <canvas ref={canvasRef} className="chart-draw" aria-hidden />
+      {confirmingClear && (
+        <div className="draw-confirm" role="alertdialog" aria-label="Clear all drawings">
+          <b>
+            Remove all {drawings.length} drawing{drawings.length === 1 ? "" : "s"} on USD/{code}?
+          </b>
+          <div>
+            <button type="button" onClick={() => setConfirmingClear(false)}>
+              Keep them
+            </button>
+            <button
+              type="button"
+              className="danger"
+              onClick={() => {
+                commit([]);
+                setSelected(null);
+                setConfirmingClear(false);
+              }}
+            >
+              Remove all
+            </button>
+          </div>
+        </div>
+      )}
       <div className="chart-tools" role="toolbar" aria-label="Chart drawing tools">
         {TOOLS.map((t) => (
           <button

@@ -1,41 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useWallets } from "@privy-io/react-auth/solana";
-import { fmt, type Market } from "@/lib/mock";
+import { fmt } from "@/lib/mock";
+import type { MarketView } from "@/lib/live";
 import { useDemo } from "@/lib/store";
 import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import { PositionsTable } from "./PositionsTable";
+import { TradeHistory } from "./TradeHistory";
 
 const TABS = ["Positions", "Open orders", "Trade history", "Balances", "Funding"] as const;
 type Tab = (typeof TABS)[number];
 
-interface StoredTrade {
-  marketId: string;
-  side: "long" | "short";
-  action: "open" | "close" | "liquidation";
-  sizeUsdc: number;
-  leverage: number;
-  price: number;
-  txSignature: string;
-  ts: string;
-}
-
-export function BottomPanel({ market }: { market: Market }) {
+export function BottomPanel({ market }: { market: MarketView }) {
   const [tab, setTab] = useState<Tab>("Positions");
   const { signedIn } = useDemo();
   const { positions, walletBalance, portfolioEquity, equity, snapshot } = useChainPortfolio();
   const { wallets } = useWallets();
-  const [storedTrades, setStoredTrades] = useState<StoredTrade[]>([]);
   const wallet = wallets[0]?.address;
-
-  useEffect(() => {
-    if (!signedIn || !wallet || tab !== "Trade history") return;
-    void fetch(`/api/trades?wallet=${encodeURIComponent(wallet)}&limit=40`, { cache: "no-store" })
-      .then((response) => response.json())
-      .then((body: { trades?: StoredTrade[] }) => setStoredTrades(body.trades ?? []))
-      .catch(() => setStoredTrades([]));
-  }, [signedIn, wallet, tab]);
 
   return (
     <div className="bpanel">
@@ -90,44 +72,9 @@ export function BottomPanel({ market }: { market: Market }) {
           </table>
         )}
 
-        {tab === "Trade history" &&
-          (signedIn && storedTrades.length > 0 ? (
-            <table className="postable">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Market</th>
-                  <th>Side</th>
-                  <th>Action</th>
-                  <th>Size</th>
-                  <th>Price</th>
-                  <th>Transaction</th>
-                </tr>
-              </thead>
-              <tbody>
-                {storedTrades.map((trade) => {
-                  const localQuote = trade.price > 0 ? market.unitSize / trade.price : 0;
-                  return (
-                    <tr key={trade.txSignature}>
-                      <td>{new Date(trade.ts).toLocaleTimeString("en-GB")}</td>
-                      <td>{trade.marketId}</td>
-                      <td style={{ color: trade.side === "long" ? "var(--up)" : "var(--dn)" }}>
-                        {trade.side === "long" ? "Long" : "Short"}
-                      </td>
-                      <td style={{ textTransform: "capitalize" }}>{trade.action}</td>
-                      <td>{fmt(trade.sizeUsdc)}</td>
-                      <td>{trade.marketId === `USD/${market.c}` ? fmt(localQuote, market.dp) : fmt(trade.price, 6)}</td>
-                      <td className="mono" title={trade.txSignature}>{trade.txSignature.slice(0, 8)}…</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <p className="bpanel-empty">
-              {signedIn ? "No trades yet." : "Sign in to see your trade history."}
-            </p>
-          ))}
+        {tab === "Trade history" && (
+          <TradeHistory market={market} wallet={wallet} signedIn={signedIn} />
+        )}
 
         {tab === "Funding" && (
           <div className="bpanel-empty" style={{ lineHeight: 1.6, maxWidth: 620 }}>

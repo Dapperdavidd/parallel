@@ -339,10 +339,11 @@ freshIdentity();
     check("the quote states a fill price", body.quote?.entryPrice > 0);
     check("the quote states the gap to the index", Number.isFinite(body.quote?.priceImpactBps));
     check("the quote states its own expiry", Boolean(Date.parse(body.quote?.expiresAt ?? "")));
+    // A user-facing long is an engine short, so in engine units its
+    // liquidation sits *above* entry. See `approximateLiquidationPrice`.
     check(
-      "the quote states where liquidation sits",
-      body.quote?.approximateLiquidationPrice > 0 &&
-        body.quote.approximateLiquidationPrice < body.quote.entryPrice,
+      "the quote states where liquidation sits, on the losing side",
+      body.quote?.approximateLiquidationPrice > body.quote?.entryPrice,
       JSON.stringify(body.quote),
     );
 

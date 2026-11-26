@@ -54,16 +54,49 @@ test("no index price means no trade", () => {
   assert.throws(() => assertEnginePriceSane(694_028n, 0, "USD/NGN"), /no price/);
 });
 
-test("liquidation sits a margin's width away, on the losing side", () => {
-  // A user-facing long gains as the local currency strengthens, so it dies
-  // below entry; a short dies above it.
-  assert.equal(approximateLiquidationPrice(1, 2, "long"), 0.5);
-  assert.equal(approximateLiquidationPrice(1, 2, "short"), 1.5);
-  assert.equal(approximateLiquidationPrice(1, 5, "long"), 0.8);
-  // At 1x a long cannot be liquidated by price alone: the price would have to
-  // reach zero, which is what this returns.
-  assert.equal(approximateLiquidationPrice(1, 1, "long"), 0);
+test("liquidation sits a margin's width away, on the side that loses", () => {
+  // Derived, not assumed. Engine P&L is `sizeQ × (exit − entry)`, and a
+  // user-facing long carries a negative sizeQ, so a long profits as the
+  // engine price falls and is liquidated when it rises. Getting this
+  // backwards is what §7.16 was, and the first version of this function
+  // had it backwards too.
+  assert.equal(approximateLiquidationPrice(1, 2, "long"), 1.5);
+  assert.equal(approximateLiquidationPrice(1, 2, "short"), 0.5);
+  assert.equal(approximateLiquidationPrice(1, 5, "long"), 1.2);
+  assert.equal(approximateLiquidationPrice(1, 5, "short"), 0.8);
   assert.throws(() => approximateLiquidationPrice(1, 0, "long"), /positive/);
+});
+
+test("liquidation agrees with the sign convention it is derived from", () => {
+  // The property, rather than the arithmetic: a position is liquidated on the
+  // side where its own P&L is negative. If `pnlSign` or `engineSign` ever
+  // flips, this fails rather than quietly showing the wrong number.
+  for (const side of ["long", "short"] as const) {
+    const entry = 0.688719;
+    const liquidation = approximateLiquidationPrice(entry, 3, side);
+    const move = liquidation - entry;
+    // pnlSign turns an engine price move into the user's P&L direction.
+    const pnlAtLiquidation = pnlSign(side) * move;
+    assert.ok(
+      pnlAtLiquidation < 0,
+      `${side} should be losing at its liquidation price, got ${pnlAtLiquidation}`,
+    );
+    // And the move is a full margin's width.
+    assert.ok(Math.abs(Math.abs(move) / entry - 1 / 3) < 1e-12);
+  }
+});
+
+test("a long's liquidation quote sits below its entry quote", () => {
+  // The quote scale is the reciprocal of the engine's, so the direction
+  // inverts. Mixing the two is how a screen ends up telling somebody they
+  // are liquidated in the direction they are profiting.
+  const unit = 1_000;
+  const entry = 0.688719;
+  const entryQuote = unit / entry;
+  const longQuote = unit / approximateLiquidationPrice(entry, 3, "long");
+  const shortQuote = unit / approximateLiquidationPrice(entry, 3, "short");
+  assert.ok(longQuote < entryQuote, `${longQuote} should be under ${entryQuote}`);
+  assert.ok(shortQuote > entryQuote, `${shortQuote} should be over ${entryQuote}`);
 });
 
 test("the user-facing side and the engine sign stay inverses", () => {

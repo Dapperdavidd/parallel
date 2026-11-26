@@ -274,6 +274,83 @@ label{font-size:13px;color:var(--ink2)}
 .ticket-summary b{font-family:var(--font-geist-mono),var(--mono);font-weight:500;color:var(--ink);text-align:right}
 .ticket-summary small{display:block;color:var(--ink3);font:10px var(--font-geist-mono),var(--mono);margin-top:2px}
 .execution-note{display:flex;flex-direction:column;gap:3px;padding:9px 10px;border:1px solid var(--ln);border-radius:9px;background:#ffffff03}
+
+/* ---- ticket: settings, capability notes, progress ----------------------- */
+
+/* A disabled control that does not say why is just a dead end. */
+.order-types button .why,
+.ticket-summary .why{display:block;font-style:normal;font-size:9.5px;letter-spacing:.04em;
+  color:var(--ink3);text-transform:none;margin-top:1px;font-weight:400}
+.ticket-summary .why{display:inline;margin-left:6px}
+
+.ticket-gear{background:none;border:0;padding:0 2px;color:var(--ink3);cursor:pointer;
+  font-size:13px;line-height:1}
+.ticket-gear:hover{color:var(--ink)}
+
+.ticket-settings{display:grid;gap:12px;padding:12px;border:1px solid var(--ln);
+  border-radius:8px;background:#ffffff04}
+.ticket-settings label{display:flex;gap:9px;align-items:flex-start;font-size:13px;cursor:pointer}
+.ticket-settings label input{margin-top:2px;flex:0 0 auto}
+.ticket-settings label span{display:flex;flex-direction:column;gap:2px}
+.ticket-settings small,
+.ticket-settings-l small{display:block;font-size:11.5px;color:var(--ink3);line-height:1.45}
+.ticket-settings-l{display:block;font-size:13px;margin-bottom:7px}
+
+.ticket-headroom{display:grid;gap:5px}
+.headroom-track{display:block;height:4px;border-radius:999px;background:#ffffff14;overflow:hidden}
+.headroom-fill{display:block;height:100%;border-radius:999px;transition:width .3s ease}
+
+.ticket-blocked{margin:0;padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.5;
+  color:var(--amb);background:rgba(242,169,59,.10);border:1px solid rgba(242,169,59,.28)}
+
+/* ---- where a transaction has got to ------------------------------------- */
+.tx-stage{display:flex;align-items:center;gap:8px;margin:0;font-size:12.5px;color:var(--ink2)}
+.tx-spin{width:11px;height:11px;flex:0 0 auto;border-radius:50%;
+  border:1.5px solid #ffffff22;border-top-color:var(--ink2)}
+@media (prefers-reduced-motion: no-preference){
+  .tx-spin{animation:tx-turn .7s linear infinite}
+}
+@keyframes tx-turn{to{transform:rotate(360deg)}}
+
+.tx-done{margin:0;font-size:12.5px;color:var(--up)}
+.tx-done a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+
+.tx-failed{display:grid;gap:7px;padding:11px;border-radius:8px;
+  background:rgba(229,72,77,.10);border:1px solid rgba(229,72,77,.30)}
+.tx-failed b{font-size:12.5px;color:var(--dn);font-weight:600}
+.tx-failed span{font-size:12px;color:var(--ink2);line-height:1.5}
+.tx-failed button{justify-self:start;height:28px;padding:0 12px;border-radius:6px;
+  border:1px solid var(--ln);background:transparent;color:var(--ink);font-size:12px;cursor:pointer}
+.tx-failed button:hover{background:#ffffff0a}
+
+/* ---- trade history controls --------------------------------------------- */
+.history{display:flex;flex-direction:column;gap:10px;min-width:0}
+.history-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:4px 16px 0}
+.history-check{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;
+  color:var(--ink2);cursor:pointer;white-space:nowrap}
+.history-count{font-size:12px;color:var(--ink3);margin-left:auto}
+.history-pager{display:flex;align-items:center;gap:12px;justify-content:center;
+  padding:4px 16px 14px;font-size:12px;color:var(--ink3)}
+.postable .msort{font-size:11px;letter-spacing:.06em}
+.postable a{color:var(--ink2);text-decoration:none}
+.postable a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+
+/* ---- in-place confirmation, instead of window.confirm ------------------- */
+.draw-confirm{position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:8;
+  display:grid;gap:9px;padding:13px 15px;border-radius:10px;max-width:min(340px,86%);
+  background:#15151A;border:1px solid var(--ln);box-shadow:0 14px 40px #0009}
+.draw-confirm b{font-size:13px;font-weight:500;line-height:1.45}
+.draw-confirm div{display:flex;gap:8px;justify-content:flex-end}
+.draw-confirm button{height:28px;padding:0 12px;border-radius:6px;border:1px solid var(--ln);
+  background:transparent;color:var(--ink);font-size:12px;cursor:pointer}
+.draw-confirm button:hover{background:#ffffff0a}
+.draw-confirm button.danger{border-color:rgba(229,72,77,.5);color:var(--dn)}
+.draw-confirm button.danger:hover{background:rgba(229,72,77,.12)}
+
+@media (max-width:860px){
+  .history-count{margin-left:0}
+}
 .execution-note b{font-size:11px;color:var(--ink2)}.execution-note span{font-size:10.5px;line-height:1.4;color:var(--ink3)}
 .order-submit{height:46px;margin-top:2px;text-transform:capitalize}
 .order-review{border:1px solid #3D5CF566;background:#3D5CF50f;border-radius:10px;padding:11px;display:flex;flex-direction:column;gap:9px}

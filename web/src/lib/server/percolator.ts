@@ -197,6 +197,21 @@ export function assertEnginePriceSane(
  * the notional. It ignores fees and accrued funding, both of which bring the
  * real liquidation slightly nearer, so it is quoted as an approximation and
  * never as a promise.
+ *
+ * **The direction is the easy thing to get backwards**, and §7.16 of the
+ * decision log is what happened the last time it was. Work it from
+ * `lib/side.ts` rather than from intuition:
+ *
+ *   - the engine price here is USD per contract, a contract being a bundle of
+ *     local currency, so the price *falls* as the local currency weakens;
+ *   - a user-facing long profits when the local currency weakens
+ *     (`engineSign("long") === -1n`, and engine P&L is
+ *     `sizeQ × (exit − entry)`), so it profits as this price falls;
+ *   - therefore a long is liquidated when this price **rises**.
+ *
+ * In the familiar quote — local currency per USD, the reciprocal — that comes
+ * out the other way round, which is why the two must never be mixed: a long's
+ * liquidation quote is *below* its entry quote.
  */
 export function approximateLiquidationPrice(
   entryPriceUsd: number,
@@ -205,7 +220,5 @@ export function approximateLiquidationPrice(
 ): number {
   if (leverage <= 0) throw new Error("Leverage must be positive");
   const move = entryPriceUsd / leverage;
-  // A user-facing long profits when the local currency strengthens, i.e. when
-  // the USD-per-unit price rises, so it is liquidated below entry.
-  return side === "long" ? Math.max(0, entryPriceUsd - move) : entryPriceUsd + move;
+  return side === "long" ? entryPriceUsd + move : Math.max(0, entryPriceUsd - move);
 }
