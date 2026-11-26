@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Lint and typecheck before a commit lands.
+#
+# Not installed by default — a hook that runs without being asked for is a
+# hook people disable. Turn it on once per clone:
+#
+#   git config core.hooksPath .githooks
+#
+# Skip it for one commit with `git commit --no-verify`.
+
+set -e
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+case "$staged" in
+  *.ts|*.tsx|*.mjs|*.js) ;;
+  *)
+    exit 0
+    ;;
+esac
+
+printf 'pre-commit: lint… '
+npm run --silent lint
+printf 'ok\npre-commit: typecheck (services)… '
+npm run --silent typecheck
+printf 'ok\npre-commit: typecheck (web)… '
+npm run --silent typecheck --prefix web
+printf 'ok\n'

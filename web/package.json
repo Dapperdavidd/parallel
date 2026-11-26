@@ -7,7 +7,9 @@
     "build": "NEXT_DIST_DIR=.next-build next build",
     "start": "NEXT_DIST_DIR=.next-build next start -p 3000",
     "typecheck": "tsc --noEmit",
-    "lint": "next lint"
+    "lint": "eslint --config ../eslint.config.mjs .",
+    "test": "PARALLEL_APP_SECRET=\"a-test-secret-at-least-thirty-two-characters\" tsx --tsconfig tsconfig.test.json --test \"test/**/*.test.ts\"",
+    "test:watch": "PARALLEL_APP_SECRET=\"a-test-secret-at-least-thirty-two-characters\" tsx --tsconfig tsconfig.test.json --test --watch \"test/**/*.test.ts\""
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.52.0",
@@ -26,6 +28,13 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "tsx": "^4.21.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1",
+    "stream-json": "^3.9.0",
+    "postcss": "^8.5.33",
+    "zod": "^4.6.7"
   }
 }

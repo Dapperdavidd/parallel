@@ -1,0 +1,78 @@
+name: CI
+
+# Everything that must be true before a change is believable: it lints, it
+# typechecks in both packages, its tests pass, and the app still builds.
+# Nothing here needs a secret, so it runs on a fork's pull request too — the
+# web app's checks all work against the local file store.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install (services)
+        run: npm ci
+
+      - name: Install (web)
+        run: npm ci --prefix web
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck (services)
+        run: npm run typecheck
+
+      - name: Typecheck (web)
+        run: npm run typecheck --prefix web
+
+      - name: Test (services)
+        run: npm test
+
+      - name: Test (web)
+        run: npm test --prefix web
+
+      - name: Build (web)
+        # The build needs no live credentials: with none set it reads the
+        # committed registry and the files under data/.
+        env:
+          PARALLEL_ENV: development
+        run: npm run build --prefix web
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Advisories are reported rather than enforced, because the ones that
+      # remain have no upstream fix: `bigint-buffer` is reachable only through
+      # @solana/spl-token, and only in its native binding, which this project
+      # does not load. A failing gate we have to ignore teaches us to ignore
+      # the gate — see DECISIONS.md.
+      - name: Audit (services)
+        run: npm audit --audit-level=critical
+      - name: Audit (web)
+        run: npm audit --audit-level=critical --prefix web
