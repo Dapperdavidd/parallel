@@ -124,7 +124,16 @@ export default function SignInPage() {
               Returning user
             </button>
           </div>
-          <Link href="/" style={{ fontSize: 14, color: "var(--ink2)" }}>
+          <Link
+            href="/"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: 24,
+              fontSize: 14,
+              color: "var(--ink2)",
+            }}
+          >
             Back to site
           </Link>
         </div>

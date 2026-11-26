@@ -7,6 +7,7 @@ import { useDemo } from "@/lib/store";
 import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import { usePercolatorTrade } from "@/lib/usePercolatorTrade";
 import { useToast } from "@/components/Toast";
+import { explorerTx } from "@/lib/explorer";
 
 /**
  * F9 — hedge mode.
@@ -254,7 +255,7 @@ export default function HedgePage() {
                     </td>
                     <td className="mono">
                       <a
-                        href={`https://explorer.solana.com/tx/${h.txSignature}?cluster=devnet`}
+                        href={explorerTx(h.txSignature)}
                         target="_blank"
                         rel="noreferrer"
                         style={{ color: "var(--ink2)" }}

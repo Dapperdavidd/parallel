@@ -4,6 +4,7 @@ import { SiteTop } from "@/components/SiteTop";
 import { Footer } from "@/components/Footer";
 import { MARKETS, compactUsd, fmt } from "@/lib/mock";
 import { vaultSnapshot } from "@/lib/server/vaults";
+import { explorerAddress } from "@/lib/explorer";
 
 export const metadata: Metadata = {
   title: "Liquidity vaults — Parallel",
@@ -196,7 +197,7 @@ export default async function VaultsPage() {
                     }}
                   >
                     <a
-                      href={`https://explorer.solana.com/address/${v.portfolio}?cluster=devnet`}
+                      href={explorerAddress(v.portfolio)}
                       target="_blank"
                       rel="noreferrer"
                       className="doc-link"
@@ -204,7 +205,7 @@ export default async function VaultsPage() {
                       Vault portfolio ↗
                     </a>
                     <a
-                      href={`https://explorer.solana.com/address/${v.market}?cluster=devnet`}
+                      href={explorerAddress(v.market)}
                       target="_blank"
                       rel="noreferrer"
                       className="doc-link"

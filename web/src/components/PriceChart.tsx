@@ -11,8 +11,9 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { candlesFor, type Candle, type Market } from "@/lib/mock";
+import { candlesFor, fmt, type Candle, type Market } from "@/lib/mock";
 import { ChartDrawings } from "@/components/trade/ChartDrawings";
+import { ChartTable, type ChartRow } from "@/components/trade/ChartTable";
 import { readScale } from "@/lib/chart-scale";
 
 /** What /api/candles returns. */
@@ -195,6 +196,9 @@ export function PriceChart({
   } | null>(null);
   /** Bar open times, for anchoring drawings between and beyond the bars. */
   const [barTimes, setBarTimes] = useState<number[]>([]);
+  /** The same candles the chart drew, for the table alternative below it. */
+  const [rows, setRows] = useState<ChartRow[]>([]);
+  const [asTable, setAsTable] = useState(false);
 
   // Create once.
   useEffect(() => {
@@ -462,6 +466,17 @@ export function PriceChart({
     // The drawing layer anchors on time, and needs the bar times to place a
     // point that falls between bars or beyond the last one. Replace the array
     // only when it has actually changed, or the layer re-renders on every poll.
+    // Keep a plain copy for the text alternative. Same source, same values —
+    // a table built from anything else could disagree with the picture.
+    setRows(
+      data.map((c) => ({
+        time: c.time as number,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      })),
+    );
     const times = data.map((c) => c.time as number);
     setBarTimes((prev) =>
       prev.length === times.length &&
@@ -552,13 +567,91 @@ export function PriceChart({
   }, []);
   const fit = useCallback(() => chartRef.current?.timeScale().fitContent(), []);
 
+  /**
+   * The chart, from a keyboard.
+   *
+   * Until now it could be focused and then did nothing: pan and zoom were
+   * mouse and touch only, so a keyboard user reached a box they could not
+   * move. These are the bindings a charting tool is expected to have, and
+   * they are listed under the chart rather than left to be guessed.
+   */
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      const step = event.shiftKey ? 220 : 70;
+      const handled = () => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+
+      switch (event.key) {
+        case "ArrowLeft":
+          handled();
+          transformView(chart, { panPx: -step, barCount: barCountRef.current });
+          break;
+        case "ArrowRight":
+          handled();
+          transformView(chart, { panPx: step, barCount: barCountRef.current });
+          break;
+        case "+":
+        case "=":
+        case "ArrowUp":
+          handled();
+          zoom(1 / 1.35);
+          break;
+        case "-":
+        case "_":
+        case "ArrowDown":
+          handled();
+          zoom(1.35);
+          break;
+        case "Home":
+        case "End":
+          handled();
+          fit();
+          break;
+        case "t":
+        case "T":
+          handled();
+          setAsTable((open) => !open);
+          break;
+        default:
+          break;
+      }
+    },
+    [zoom, fit],
+  );
+
+  // What the picture says, for anyone who cannot see it. Read off the same
+  // rows the table uses, so the three can never disagree.
+  const summary = (() => {
+    if (rows.length === 0) return `USD/${market.c} price chart. No history yet.`;
+    const first = rows[0]!;
+    const last = rows[rows.length - 1]!;
+    const move = first.open > 0 ? ((last.close - first.open) / first.open) * 100 : 0;
+    const highs = rows.map((r) => r.high);
+    const lows = rows.map((r) => r.low);
+    return (
+      `USD/${market.c}, ${timeframe} candles. ` +
+      `${rows.length} periods from ${new Date(first.time * 1000).toLocaleDateString()} ` +
+      `to ${new Date(last.time * 1000).toLocaleDateString()}. ` +
+      `Latest close ${fmt(last.close, market.dp)}, ` +
+      `${move >= 0 ? "up" : "down"} ${Math.abs(move).toFixed(2)}% across the range. ` +
+      `High ${fmt(Math.max(...highs), market.dp)}, low ${fmt(Math.min(...lows), market.dp)}. ` +
+      `Press T, or use the button below, for these figures as a table.`
+    );
+  })();
+
   return (
     <div className="chart-wrap" ref={wrapRef}>
       <div
         ref={hostRef}
         className="chart-host"
         role="img"
-        aria-label={`USD/${market.c} price chart`}
+        tabIndex={0}
+        aria-label={summary}
+        onKeyDown={onKeyDown}
       />
 
       {api && (
@@ -580,10 +673,40 @@ export function PriceChart({
         <button type="button" onClick={() => zoom(1.35)} title="Zoom out" aria-label="Zoom out">
           −
         </button>
-        <button type="button" onClick={fit} title="Fit the whole series (or double-click the chart)" aria-label="Fit">
+        <button
+          type="button"
+          onClick={fit}
+          title="Fit the whole series (or double-click the chart)"
+          aria-label="Fit the whole series"
+        >
           ⤢
         </button>
       </div>
+
+      <div className="chart-foot">
+        <button
+          type="button"
+          className="closebtn"
+          aria-expanded={asTable}
+          onClick={() => setAsTable((open) => !open)}
+        >
+          {asTable ? "Hide the figures" : "View as a table"}
+        </button>
+        <span className="chart-keys">
+          With the chart focused: <kbd>←</kbd> <kbd>→</kbd> pan · <kbd>+</kbd> <kbd>−</kbd> zoom ·{" "}
+          <kbd>Home</kbd> fit · <kbd>T</kbd> table
+        </span>
+      </div>
+
+      {asTable && (
+        <ChartTable
+          rows={rows}
+          code={market.c}
+          dp={market.dp}
+          timeframe={timeframe}
+          source="Parallel street index"
+        />
+      )}
     </div>
   );
 }

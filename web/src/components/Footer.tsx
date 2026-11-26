@@ -52,15 +52,21 @@ export function Footer() {
           </span>
         </div>
 
-        <div className="fcols">
+        {/* The column headings are h3, so they need an h2 above them or every
+            page whose body stops at h1 reports a skipped level. The footer is
+            also a navigation landmark, and naming it is worth doing anyway. */}
+        <nav className="fcols" aria-labelledby="footer-nav-heading">
+          <h2 id="footer-nav-heading" className="sr-only">
+            Site
+          </h2>
           <div>
-            <h4>Trade</h4>
+            <h3>Trade</h3>
             <Link href="/app/markets" prefetch={false}>Markets</Link>
             <Link href="/app/trade?m=NGN" prefetch={false}>USD/NGN</Link>
             <Link href="/app/hedge" prefetch={false}>Hedge mode</Link>
           </div>
           <div>
-            <h4>Docs</h4>
+            <h3>Docs</h3>
             <Link href="/docs">Start here</Link>
             <Link href="/docs/prices">How prices work</Link>
             <Link href="/docs/trading">How trading works</Link>
@@ -69,7 +75,7 @@ export function Footer() {
             <Link href="/docs/api">API documentation</Link>
           </div>
           <div>
-            <h4>Parallel</h4>
+            <h3>Parallel</h3>
             <Link href="/docs/about">About</Link>
             <Link href="/open-index">Open index</Link>
             <Link href="/vaults">Liquidity vaults</Link>
@@ -77,7 +83,7 @@ export function Footer() {
             <Link href="/status">System status</Link>
             <Link href="/signin" prefetch={false}>Sign in / Sign up</Link>
           </div>
-        </div>
+        </nav>
       </div>
 
       <div className="tiles">

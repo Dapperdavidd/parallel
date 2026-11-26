@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { fmt } from "@/lib/mock";
 import { latestTicks, listMarkets, registryMeta } from "@/lib/server/data";
 import { MARKETS } from "@/lib/mock";
+import { explorerTx } from "@/lib/explorer";
 
 export const metadata: Metadata = {
   title: "Open index — Parallel",
@@ -212,7 +213,7 @@ export default async function IndexPage() {
                     {t?.pushedTx ? (
                       <a
                         className="idx-link"
-                        href={`https://explorer.solana.com/tx/${t.pushedTx}?cluster=devnet`}
+                        href={explorerTx(t.pushedTx)}
                         target="_blank"
                         rel="noreferrer"
                       >
