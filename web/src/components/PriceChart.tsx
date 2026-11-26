@@ -166,6 +166,8 @@ export function PriceChart({
   timeframe,
   trades,
   indicators,
+  showFills = true,
+  showOfficial = true,
   onSource,
 }: {
   market: Market;
@@ -173,6 +175,10 @@ export function PriceChart({
   /** The viewer's confirmed trades in this market. */
   trades: { ts: string; side: "long" | "short"; action: string }[];
   indicators: ChartIndicators;
+  /** Draw markers where this wallet traded. A reader preference. */
+  showFills?: boolean;
+  /** Draw the published official rate behind the candles. A reader preference. */
+  showOfficial?: boolean;
   /** Tells the caller what the chart is actually showing, so it can say so. */
   onSource?: (s: { mode: "index" | "official-candles" | "official" | "sample"; indexFrom: string | null }) => void;
 }) {
@@ -487,8 +493,11 @@ export function PriceChart({
     );
 
     // The dashed line is either the official-rate history (pre-launch) or the
-    // current official rate drawn flat across the measured span.
-    if (mode === "official-candles") {
+    // current official rate drawn flat across the measured span. The switch
+    // for it in the settings menu was decorative until now.
+    if (!showOfficial) {
+      official.setData([]);
+    } else if (mode === "official-candles") {
       // The candles already are the official series; a second copy of it as a
       // line would just be noise.
       official.setData([]);
@@ -521,7 +530,7 @@ export function PriceChart({
     const first = data[0]!.time as number;
     const last = data[data.length - 1]!.time as number;
     candles.setMarkers(
-      trades
+      (showFills ? trades : [])
         .map((t) => ({ t, at: Math.floor(new Date(t.ts).getTime() / 1000) }))
         .filter(({ at }) => at >= first && at <= last)
         .sort((a, b) => a.at - b.at)
@@ -559,7 +568,10 @@ export function PriceChart({
       chart.timeScale().fitContent();
       fittedRef.current = key;
     }
-  }, [market, timeframe, trades, feed, indicators, onSource]);
+    // `showFills` and `showOfficial` belong here: without them, turning an
+    // overlay off waited for the next data pass to take effect, which looks
+    // like a switch that does not work.
+  }, [market, timeframe, trades, feed, indicators, showFills, showOfficial, onSource]);
 
   const zoom = useCallback((factor: number) => {
     const chart = chartRef.current;

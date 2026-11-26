@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useNumberFormat } from "@/lib/format-provider";
+import { usePreferences } from "@/lib/preferences";
+import { NUMBER_STYLES } from "@/lib/number-format";
 
 /**
  * Settings popover, opened from the gear in the top bar.
@@ -8,53 +11,38 @@ import { useEffect, useRef, useState } from "react";
  * Deliberately a panel that overlays in place rather than a route: nothing
  * about changing a display preference should cost you your chart.
  *
- * PHASE 2 — the toggles hold their state and nothing more. Each is wired to a
- * real behaviour in Phase 3; the labels are the contract.
+ * It used to carry twelve switches that held their own state and changed
+ * nothing — "Play sound on fill", "Liquidation warnings", "Transaction delay
+ * protection". They were written as a contract for Phase 3, and a person
+ * using the app cannot tell a contract from a feature. Switching off
+ * liquidation warnings that were never on is worse than having no switch.
+ *
+ * What is here now is what works, wired to `lib/preferences.ts`. What is not
+ * built is named at the bottom, which is the honest version of the same
+ * promise.
  */
 
-interface Toggle {
-  key: string;
-  label: string;
-  on: boolean;
-  /** Not yet wired to anything — shown muted so it does not over-promise. */
-  pending?: boolean;
-}
-
-const GROUPS: { title: string; items: Toggle[] }[] = [
+const TOGGLES: { key: "confirmTrades" | "showFills" | "showOfficial"; label: string; hint: string }[] = [
   {
-    title: "Trading",
-    items: [
-      { key: "confirmOpen", label: "Open position confirmation", on: true },
-      { key: "confirmClose", label: "Close position confirmation", on: true },
-      { key: "holdToClose", label: "Hold to close all positions", on: false },
-      { key: "delayProtect", label: "Transaction delay protection", on: true },
-    ],
+    key: "confirmTrades",
+    label: "Review before sending",
+    hint: "Show the order summary and wait for a second press.",
   },
   {
-    title: "Display",
-    items: [
-      { key: "showFills", label: "Show my fills on the chart", on: true },
-      { key: "showPnl", label: "Show PnL", on: true },
-      { key: "showOfficial", label: "Show official-rate overlay", on: true },
-      { key: "compact", label: "Compact numbers", on: false },
-    ],
+    key: "showFills",
+    label: "My fills on the chart",
+    hint: "Markers where this wallet opened and closed.",
   },
   {
-    title: "Notifications",
-    items: [
-      { key: "fillNotify", label: "Fill notifications", on: true },
-      { key: "fillSound", label: "Play sound on fill", on: false },
-      { key: "liqWarn", label: "Liquidation warnings", on: true },
-      { key: "verbose", label: "Verbose errors", on: false },
-    ],
+    key: "showOfficial",
+    label: "Official-rate overlay",
+    hint: "The published rate, dashed, behind the street candles.",
   },
 ];
 
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(GROUPS.flatMap((g) => g.items.map((i) => [i.key, i.on]))),
-  );
+  const { preferences, set } = usePreferences();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,29 +78,62 @@ export function SettingsMenu() {
 
       {open && (
         <div className="pop-panel" role="dialog" aria-label="Settings">
-          {GROUPS.map((g) => (
-            <div className="pop-group" key={g.title}>
-              <div className="pop-title">{g.title}</div>
-              {g.items.map((i) => (
-                <label className="pop-row" key={i.key}>
-                  <span>{i.label}</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={state[i.key] ?? false}
-                    aria-label={i.label}
-                    className={`sw${state[i.key] ? " on" : ""}`}
-                    onClick={() => setState((s) => ({ ...s, [i.key]: !s[i.key] }))}
-                  >
-                    <i />
-                  </button>
-                </label>
-              ))}
+          <div className="pop-group">
+            <div className="pop-title">Trading</div>
+            {TOGGLES.filter((t) => t.key === "confirmTrades").map((t) => (
+              <label className="pop-row" key={t.key} title={t.hint}>
+                <span>{t.label}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={preferences[t.key]}
+                  aria-label={t.label}
+                  className={`sw${preferences[t.key] ? " on" : ""}`}
+                  onClick={() => set(t.key, !preferences[t.key])}
+                >
+                  <i />
+                </button>
+              </label>
+            ))}
+            <div className="pop-row" title="We refuse a fill that has moved further than this.">
+              <span>Max slippage</span>
+              <span className="mono" style={{ fontSize: 12, color: "var(--ink2)" }}>
+                {preferences.maxSlippageBps / 100}%
+              </span>
             </div>
-          ))}
+            <p className="pop-note">Slippage is set on the order ticket, beside the trade.</p>
+          </div>
+
+          <div className="pop-group">
+            <div className="pop-title">Chart</div>
+            {TOGGLES.filter((t) => t.key !== "confirmTrades").map((t) => (
+              <label className="pop-row" key={t.key} title={t.hint}>
+                <span>{t.label}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={preferences[t.key]}
+                  aria-label={t.label}
+                  className={`sw${preferences[t.key] ? " on" : ""}`}
+                  onClick={() => set(t.key, !preferences[t.key])}
+                >
+                  <i />
+                </button>
+              </label>
+            ))}
+          </div>
+
+          <div className="pop-group">
+            <div className="pop-title">Not built yet</div>
+            <p className="pop-note">
+              Fill notifications, sounds and liquidation alerts. There were switches for these
+              and they did nothing, which is a worse promise than this sentence.
+            </p>
+          </div>
+
           <div className="pop-foot">
             <span>Devnet beta</span>
-            <span className="mono">rev 2026-11-21</span>
+            <span className="mono">devnet</span>
           </div>
         </div>
       )}
@@ -121,13 +142,21 @@ export function SettingsMenu() {
 }
 
 /**
- * Number-format and language picker, the globe next to the gear.
- * Phase 2 changes the label only.
+ * Number format, the globe next to the gear.
+ *
+ * It used to offer four languages and three number formats, and apply none of
+ * them: both pickers set a piece of React state and stopped there. A menu
+ * offering Français to somebody who then reads an English screen is worse
+ * than no menu, and this product cannot afford small lies in its interface.
+ *
+ * So the number format is now real — it is the one of the two that can be
+ * done properly, and `Intl` does the work. The language list is gone,
+ * replaced by a sentence saying English is all there is. When there is a
+ * translation, it goes here.
  */
 export function LocaleMenu() {
   const [open, setOpen] = useState(false);
-  const [fmtStyle, setFmtStyle] = useState("1,234.56");
-  const [lang, setLang] = useState("English");
+  const { style, choose } = useNumberFormat();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -144,7 +173,7 @@ export function LocaleMenu() {
       <button
         type="button"
         className="icon-btn"
-        aria-label="Language and number format"
+        aria-label="Number format"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
@@ -155,32 +184,31 @@ export function LocaleMenu() {
       </button>
 
       {open && (
-        <div className="pop-panel" style={{ width: 260 }} role="dialog" aria-label="Language and number format">
+        <div className="pop-panel" style={{ width: 268 }} role="dialog" aria-label="Number format">
           <div className="pop-group">
             <div className="pop-title">Number format</div>
-            {["1,234.56", "1.234,56", "1 234.56"].map((f) => (
+            {NUMBER_STYLES.map((option) => (
               <button
-                key={f}
+                key={option.locale}
                 type="button"
-                className={`pop-opt${f === fmtStyle ? " on" : ""}`}
-                onClick={() => setFmtStyle(f)}
+                className={`pop-opt${option.locale === style.locale ? " on" : ""}`}
+                aria-pressed={option.locale === style.locale}
+                title={option.label}
+                onClick={() => {
+                  choose(option.locale);
+                  setOpen(false);
+                }}
               >
-                <span className="mono">{f}</span>
+                <span className="mono">{option.sample}</span>
               </button>
             ))}
           </div>
           <div className="pop-group">
             <div className="pop-title">Language</div>
-            {["English", "Français", "Português", "हिन्दी"].map((l) => (
-              <button
-                key={l}
-                type="button"
-                className={`pop-opt${l === lang ? " on" : ""}`}
-                onClick={() => setLang(l)}
-              >
-                {l}
-              </button>
-            ))}
+            <p className="pop-note">
+              English only, for now. We would rather say that than offer a language and then
+              show you this sentence in English anyway.
+            </p>
           </div>
         </div>
       )}

@@ -20,6 +20,8 @@
  *   - Prices are the measured medians rather than the prototype's placeholders.
  */
 
+import { numberStyle } from "./number-format";
+
 export type MarketStatus = "Live" | "Beta";
 
 export interface Market {
@@ -98,8 +100,18 @@ export const premium = (m: Market): number => (m.px / m.off - 1) * 100;
 /** USD price of one tradable contract. */
 export const unitPriceUsd = (m: Market): number => m.unitSize / m.px;
 
+/**
+ * A number, written the way the reader writes numbers.
+ *
+ * The locale is a setting (`lib/number-format.ts`), not a constant. It used
+ * to be hard-coded to en-US while the app bar offered a picker that set a
+ * piece of React state and changed nothing on screen.
+ */
 export const fmt = (n: number, d = 2): string =>
-  n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  n.toLocaleString(numberStyle().locale, {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+  });
 
 /* ------------------------------------------------------------------ *
  * Candles
@@ -322,9 +334,12 @@ export function agoLabel(sec: number): string {
 }
 
 export function compactUsd(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
+  const locale = numberStyle().locale;
+  const short = (value: number, places: number): string =>
+    value.toLocaleString(locale, { minimumFractionDigits: places, maximumFractionDigits: places });
+  if (n >= 1_000_000) return `$${short(n / 1_000_000, 2)}M`;
+  if (n >= 1_000) return `$${short(n / 1_000, 1)}K`;
+  return `$${short(n, 0)}`;
 }
 
 /** What the devnet faucet hands out per request. */

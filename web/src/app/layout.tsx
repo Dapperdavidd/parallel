@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "@/styles/design.css";
 import { ToastProvider } from "@/components/Toast";
 import { LiveProvider } from "@/lib/live";
+import { FormatProvider } from "@/lib/format-provider";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -44,8 +45,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Everything to do with wallets lives in `<WalletStack>`, mounted by
             /app and /signin, because the Privy SDK is most of the
             JavaScript on this site and the docs do not need it. */}
+        {/* LiveProvider sits *outside* FormatProvider on purpose. Changing
+            the number format remounts everything below it, and if the price
+            state were inside that subtree it would be thrown away too — the
+            board would blink back to "Sample data" and refetch, for a change
+            of decimal separator. */}
         <LiveProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <FormatProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </FormatProvider>
         </LiveProvider>
       </body>
     </html>

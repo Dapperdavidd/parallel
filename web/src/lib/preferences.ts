@@ -23,11 +23,17 @@ export interface Preferences {
   confirmTrades: boolean;
   /** How far the fill may drift from the price on screen, in basis points. */
   maxSlippageBps: number;
+  /** Draw markers on the chart where this wallet opened and closed. */
+  showFills: boolean;
+  /** Draw the published official rate as a dashed line behind the candles. */
+  showOfficial: boolean;
 }
 
 export const DEFAULTS: Preferences = {
   confirmTrades: true,
   maxSlippageBps: 100,
+  showFills: true,
+  showOfficial: true,
 };
 
 /** The tolerances a person can pick between, as basis points. */
@@ -39,9 +45,12 @@ const read = (): Preferences => {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw) as Partial<Preferences>;
+    const flag = (value: unknown, fallback: boolean): boolean =>
+      typeof value === "boolean" ? value : fallback;
     return {
-      confirmTrades:
-        typeof parsed.confirmTrades === "boolean" ? parsed.confirmTrades : DEFAULTS.confirmTrades,
+      confirmTrades: flag(parsed.confirmTrades, DEFAULTS.confirmTrades),
+      showFills: flag(parsed.showFills, DEFAULTS.showFills),
+      showOfficial: flag(parsed.showOfficial, DEFAULTS.showOfficial),
       maxSlippageBps:
         typeof parsed.maxSlippageBps === "number" &&
         parsed.maxSlippageBps >= 1 &&

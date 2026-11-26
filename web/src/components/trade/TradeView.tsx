@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { MARKETS } from "@/lib/mock";
 import { useMarket } from "@/lib/live";
 import { useDemo } from "@/lib/store";
+import { usePreferences } from "@/lib/preferences";
 import { useChainPortfolio } from "@/lib/useChainPortfolio";
 import {
   PriceChart,
@@ -36,6 +37,7 @@ export function TradeView() {
   const params = useSearchParams();
   const { market: stateMarket, setMarket } = useDemo();
   const { trades } = useChainPortfolio();
+  const { preferences } = usePreferences();
   const [tf, setTf] = useState<Timeframe>("1H");
   const [indicators, setIndicators] = useState<ChartIndicators>({ ma20: true, ema50: false });
 
@@ -150,6 +152,8 @@ export function TradeView() {
             market={m}
             timeframe={tf}
             indicators={indicators}
+            showFills={preferences.showFills}
+            showOfficial={preferences.showOfficial}
             trades={(trades ?? []).filter((t) => t.marketId === `USD/${m.c}`)}
             onSource={onSource}
           />
