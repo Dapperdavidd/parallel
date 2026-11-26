@@ -72,11 +72,12 @@ It needs the oracle authority keypair and, if you want history, the Supabase
 service role key. It does **not** need the web app, and the web app does not
 need it to serve — a stale index shows as stale rather than as an outage.
 
-**It currently runs on a laptop under `caffeinate`.** This is the largest open
-operational risk in the project. A sleeping laptop is a stale index, and a
-stale index is a market that pauses itself — which is the safe failure, but
-still an outage. Moving it to a small always-on host is an owner decision and
-the only thing on this page that cannot be done from inside the repository.
+The cloud target is Northflank Sandbox. The root `Dockerfile` runs the keeper and signer
+as one always-on service through `npm run cloud`; `/health` belongs to the
+signer and is the deployment health check. If either child exits, the
+supervisor stops the other and exits so Northflank restarts the complete unit.
+Until that service has been created and its secrets injected, the laptop
+supervisor remains the live process.
 
 ### The signer
 
@@ -88,6 +89,15 @@ Run it on the machine holding the keys, bound to loopback unless you have a
 reason. Point the web app at it with `PARALLEL_SIGNER_URL` and the web app
 stops holding keys at all. See ARCHITECTURE.md for what it will and will not
 sign.
+
+The selected managed-key backend is Turnkey because it supports Ed25519 and
+imports existing Solana private keys without changing their public addresses.
+With `TURNKEY_API_PUBLIC_KEY`, `TURNKEY_API_PRIVATE_KEY`, and
+`TURNKEY_ORGANIZATION_ID` set, the signer asks Turnkey to sign the already
+policy-checked message and never reads the liquidity keys from disk. A partial
+Turnkey configuration is refused at boot. The Turnkey organization must also
+have a policy limiting the imported authorities to the service credential;
+the application's signer policy remains the second, independent boundary.
 
 ### The web app
 
@@ -117,6 +127,29 @@ boots happily and fails every write.
    is not a key to anything persistent.
 6. **A GitHub integration follows a repository by id, not by name.** After the
    repository swap, any deploy hook is still watching the old one.
+
+### Northflank keeper + signer
+
+1. Create one combined service in a Sandbox project from
+   `Dapperdavidd/parallel`; Northflank builds the root `Dockerfile`, which
+   starts `npm run cloud`.
+2. Set `SOLANA_RPC_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `PARALLEL_SIGNER_SECRET`, and `PARALLEL_ORACLE_AUTHORITY_SECRET`.
+3. During the managed-key migration, set the three `TURNKEY_*` credentials.
+   Until all liquidity keys are imported, use `PARALLEL_LIQUIDITY_SECRETS`
+   instead; never set both as a fallback strategy.
+4. Generate a public Northflank domain for the signer and set that URL plus the
+   same `PARALLEL_SIGNER_SECRET` on the web deployment.
+5. Set the deployment health-check path to `/health`, keep one replica, and use
+   the platform's restart-on-failure policy.
+6. Confirm `/health` reports 13 markets and the intended `keyBackend`, then
+   wait for two keeper passes and confirm `/api/ready` and all source probes.
+7. Only after the cloud keeper is proven healthy, stop the laptop supervisor.
+
+The cloud service's different egress is also the first fix for EGP, GHS, KES,
+and PKR. Re-run `npm run sources:probe` on Northflank before adding venues. If the
+four markets still lack two live readings there, keep them paused and research
+an additional independent source; do not weaken the two-source rule.
 
 ## Backup and recovery
 
@@ -197,15 +230,14 @@ rather than the last.
 
 ## The honest list of what is not done
 
-- The keeper is on a laptop (above).
+- The Northflank service is prepared but not active until the account, secrets,
+  domain, and two-pass verification are completed.
 - Rate limiting counts in one process's memory. Fine for one instance; the
   faucet's own cooldown is durable, so the path that moves value does not rely
   on it.
 - No alerting is wired up. The signals are all exposed; nothing is paging
   anyone.
-- Signing keys are read from disk or the environment. The signer service is the
-  architectural step that makes a KMS possible — the keys are behind one
-  interface now — but it is not a KMS.
-- Four markets (EGP, GHS, KES, PKR) sit on one live source and therefore pause
-  themselves. Their P2P venues block our egress. That needs either a different
-  venue or an egress that is not this network.
+- Turnkey support is implemented, but the existing liquidity keys have not yet
+  been imported and its service policy has not yet been created.
+- Four markets (EGP, GHS, KES, PKR) must be re-probed from Northflank's egress;
+  they remain paused whenever fewer than two sources survive.

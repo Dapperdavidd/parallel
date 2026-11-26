@@ -111,6 +111,15 @@ const WALLET_DIR = "wallets";
  * These are devnet throwaways. The directory is gitignored.
  */
 export function loadOrCreateWallet(name: string): Keypair {
+  if (name === "oracle-authority") {
+    const inline = process.env.PARALLEL_ORACLE_AUTHORITY_SECRET;
+    if (inline) {
+      const secret = JSON.parse(inline) as number[];
+      const keypair = Keypair.fromSecretKey(Uint8Array.from(secret));
+      console.log(`  loaded devnet wallet ${name} from the environment`);
+      return keypair;
+    }
+  }
   const path = `${WALLET_DIR}/${name}.json`;
   if (existsSync(path)) {
     const secret = JSON.parse(readFileSync(path, "utf8")) as number[];

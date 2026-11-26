@@ -29,6 +29,7 @@
     "sources:probe": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/tools/probe-sources.ts",
     "dns:check": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/tools/dns-check.ts",
     "signer": "node --env-file-if-exists=.env ./node_modules/.bin/tsx src/services/signer.ts",
+    "cloud": "node scripts/cloud-services.mjs",
     "test": "tsx --test \"test/**/*.test.ts\"",
     "test:all": "npm test && npm --prefix web test",
     "lint": "eslint .",
@@ -41,8 +42,11 @@
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.98.0",
     "@supabase/supabase-js": "^2.119.2",
+    "@turnkey/sdk-server": "^8.11.0",
+    "@turnkey/solana": "^1.1.52",
     "bs58": "^6.0.0",
     "dotenv": "^17.2.4",
+    "tsx": "^4.21.0",
     "undici": "^8.13.1"
   },
   "devDependencies": {
@@ -52,7 +56,6 @@
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^15.15.0",
-    "tsx": "^4.21.0",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.74.0"
   },

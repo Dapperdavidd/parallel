@@ -62,16 +62,27 @@ const REQUIREMENTS: readonly Requirement[] = [
     why: "the faucet's mint authority must be injected, not read out of the repository's wallets folder",
   },
   {
-    keys: ["PARALLEL_LIQUIDITY_SECRETS", "PARALLEL_LIQUIDITY_SECRETS_DIR"],
-    why: "the per-market liquidity signers must be injected for the same reason",
+    keys: [
+      "PARALLEL_SIGNER_URL",
+      "PARALLEL_LIQUIDITY_SECRETS",
+      "PARALLEL_LIQUIDITY_SECRETS_DIR",
+    ],
+    why: "trades need either the isolated signer service or explicitly injected local liquidity keys",
   },
 ];
 
 /** Names of the variables production needs and this process does not have. */
 export function missingProductionEnv(): { key: string; why: string }[] {
-  return REQUIREMENTS.filter(({ keys }) => keys.every((key) => !process.env[key])).map(
+  const missing = REQUIREMENTS.filter(({ keys }) => keys.every((key) => !process.env[key])).map(
     ({ keys, why }) => ({ key: keys.join(" or "), why }),
   );
+  if (process.env.PARALLEL_SIGNER_URL && !process.env.PARALLEL_SIGNER_SECRET) {
+    missing.push({
+      key: "PARALLEL_SIGNER_SECRET",
+      why: "authenticates every request sent to the isolated signer service",
+    });
+  }
+  return missing;
 }
 
 export class EnvironmentError extends Error {

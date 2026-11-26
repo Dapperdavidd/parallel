@@ -1,0 +1,13 @@
+.git
+.github
+.env
+.env.*
+wallets
+data
+web
+spike7
+node_modules
+*.bundle
+*.log
+DECISIONS.md
+HANDOFF.md

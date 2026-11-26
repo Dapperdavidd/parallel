@@ -34,6 +34,8 @@ import { createHmac, createPrivateKey, sign, timingSafeEqual } from "node:crypto
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Keypair } from "@solana/web3.js";
+import { Turnkey } from "@turnkey/sdk-server";
+import { TurnkeySigner } from "@turnkey/solana";
 import { loadRegistry, type Registry } from "../lib/registry.js";
 import { refusalReason } from "../lib/signer-policy.js";
 import { stayAlive } from "../lib/stay-alive.js";
@@ -45,6 +47,42 @@ const RED = "\x1b[31m";
 const OFF = "\x1b[0m";
 
 const stamp = (): string => new Date().toISOString();
+
+type KeyBackend = "local" | "turnkey";
+
+const TURNKEY_KEYS = [
+  "TURNKEY_API_PUBLIC_KEY",
+  "TURNKEY_API_PRIVATE_KEY",
+  "TURNKEY_ORGANIZATION_ID",
+] as const;
+
+function keyBackend(): KeyBackend {
+  const present = TURNKEY_KEYS.filter((name) => Boolean(process.env[name]));
+  if (present.length === 0) return "local";
+  if (present.length !== TURNKEY_KEYS.length) {
+    const missing = TURNKEY_KEYS.filter((name) => !process.env[name]);
+    throw new Error(`incomplete Turnkey configuration; missing ${missing.join(", ")}`);
+  }
+  return "turnkey";
+}
+
+let managedSigner: TurnkeySigner | undefined;
+
+function turnkeySigner(): TurnkeySigner {
+  if (managedSigner) return managedSigner;
+  const organizationId = process.env.TURNKEY_ORGANIZATION_ID!;
+  const turnkey = new Turnkey({
+    apiBaseUrl: process.env.TURNKEY_API_BASE_URL ?? "https://api.turnkey.com",
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+    defaultOrganizationId: organizationId,
+  });
+  managedSigner = new TurnkeySigner({
+    client: turnkey.apiClient(),
+    organizationId,
+  });
+  return managedSigner;
+}
 
 function secret(): Buffer {
   const value = process.env.PARALLEL_SIGNER_SECRET;
@@ -90,6 +128,19 @@ function signWith(keypair: Keypair, message: Buffer): Buffer {
   return sign(null, message, key);
 }
 
+async function signFor(
+  authority: string,
+  message: Buffer,
+  registry: Registry,
+  backend: KeyBackend,
+): Promise<Buffer> {
+  if (backend === "local") return signWith(keypairFor(authority), message);
+  const entry = registry.markets.find((market) => market.currency === authority);
+  const address = entry?.liquidityVault?.authority;
+  if (!address) throw new Error(`no managed signing address configured for ${authority}`);
+  return Buffer.from(await turnkeySigner().signMessage(message, address));
+}
+
 async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   let total = 0;
@@ -120,9 +171,10 @@ async function handle(
   response: ServerResponse,
   registry: Registry,
   key: Buffer,
+  backend: KeyBackend,
 ): Promise<void> {
   if (request.url === "/health") {
-    send(response, 200, { ok: true, markets: registry.markets.length });
+    send(response, 200, { ok: true, markets: registry.markets.length, keyBackend: backend });
     return;
   }
   if (request.method !== "POST" || request.url !== "/sign") {
@@ -161,7 +213,7 @@ async function handle(
   }
 
   try {
-    const signature = signWith(keypairFor(authority), messageBytes);
+    const signature = await signFor(authority, messageBytes, registry, backend);
     console.log(`${DIM}${stamp()} signer: signed a ${authority} trade${OFF}`);
     send(response, 200, { signature: signature.toString("base64") });
   } catch (error) {
@@ -180,18 +232,21 @@ async function main(): Promise<void> {
   const registry = loadRegistry();
   if (!registry) throw new Error("market-registry.json is missing — run the market creation first");
   const key = secret();
+  const backend = keyBackend();
 
   // Loopback by default. A signer reachable from the network is a key
   // reachable from the network; binding wider should be a deliberate act.
   const host = process.env.PARALLEL_SIGNER_HOST ?? "127.0.0.1";
 
   const server = createServer((request, response) => {
-    void handle(request, response, registry, key).catch(() => send(response, 500, { error: "failed" }));
+    void handle(request, response, registry, key, backend).catch(() =>
+      send(response, 500, { error: "failed" }),
+    );
   });
   server.listen(port, host, () => {
     console.log(
       `signer: listening on http://${host}:${port} for ${registry.markets.length} markets\n` +
-        `${DIM}  signing only Percolator trades against registry markets${OFF}`,
+        `${DIM}  signing only Percolator trades against registry markets · keys: ${backend}${OFF}`,
     );
   });
 }
