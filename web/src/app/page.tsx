@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink } from "@/components/AppLink";
 import { SiteTop } from "@/components/SiteTop";
 import { IntroStage } from "@/components/IntroStage";
 import { FeatureScroll } from "@/components/FeatureScroll";
@@ -31,13 +31,13 @@ export default function HomePage() {
               on the naira market, ready to trade.
             </p>
             <div>
-              <Link
+              <AppLink
                 href="/signin"
                 className="btn btn-light"
                 style={{ height: 56, padding: "0 30px", fontSize: 16 }}
               >
                 Create account
-              </Link>
+              </AppLink>
             </div>
             {/* "Mainnet coming soon" was a promise with no date behind it.
                 The FAQ answers this honestly — audited contracts and a clear

@@ -12,6 +12,21 @@ const LINKS: [string, string][] = [
 ];
 
 /**
+ * Routes we do not prefetch.
+ *
+ * Next fetches a linked route's JavaScript when the link enters the viewport.
+ * "Trade" and "Sign in" sit in the header of every marketing and
+ * documentation page, and both lead into the app — so reading the FAQ pulled
+ * down the Privy SDK, the Solana kit and the wallet connectors, which is most
+ * of the JavaScript on this site, for a page made of prose.
+ *
+ * The cost of turning it off is a slower first click, paid only by people who
+ * click. The cost of leaving it on is paid by everybody, on the connections
+ * this product exists for.
+ */
+const heavy = (href: string): boolean => href.startsWith("/app") || href.startsWith("/signin");
+
+/**
  * Landing nav: mark on the left, links centred, sign-in on the right.
  *
  * "Markets" and "Product" scroll the page. "Trade" goes straight into the app
@@ -80,7 +95,7 @@ export function LandingNav() {
 
         <div className="navpill">
           {LINKS.map(([href, label]) => (
-            <Link key={href} href={href}>
+            <Link key={href} href={href} prefetch={heavy(href) ? false : undefined}>
               {label}
             </Link>
           ))}
@@ -143,7 +158,7 @@ export function LandingNav() {
             </svg>
           </button>
 
-          <Link href="/signin" className="btn btn-light" style={{ height: 42 }}>
+          <Link href="/signin" prefetch={false} className="btn btn-light" style={{ height: 42 }}>
             Sign in / Sign up
           </Link>
         </div>
@@ -153,7 +168,12 @@ export function LandingNav() {
         <div className="navsheet" id="nav-sheet">
           <div className="navsheet-inner">
             {LINKS.map(([href, label]) => (
-              <Link key={href} href={href} onClick={() => setSheet(false)}>
+              <Link
+                key={href}
+                href={href}
+                prefetch={heavy(href) ? false : undefined}
+                onClick={() => setSheet(false)}
+              >
                 {label}
               </Link>
             ))}

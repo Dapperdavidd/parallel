@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink } from "./AppLink";
 import { fmt, premium, type Market } from "@/lib/mock";
 import { useMarkets } from "@/lib/live";
 
@@ -68,7 +68,7 @@ export function MarketRows({ codes }: { codes: string[] }) {
         const m = byCode(c);
         const p = premium(m);
         return (
-          <Link className="mrow" key={c} href={`/app/trade?m=${m.c}`}>
+          <AppLink className="mrow" key={c} href={`/app/trade?m=${m.c}`}>
             <span style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <CurrencyBadge m={m} />
               <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -88,7 +88,7 @@ export function MarketRows({ codes }: { codes: string[] }) {
             <span className="hide-sm" style={{ textAlign: "right", color: "var(--ink2)", fontSize: 14 }}>
               {m.reg}
             </span>
-          </Link>
+          </AppLink>
         );
       })}
     </>

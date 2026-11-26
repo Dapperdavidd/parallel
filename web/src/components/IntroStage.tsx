@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AppLink } from "./AppLink";
 import { useEffect, useRef, useState } from "react";
 import { MarketRows } from "./MarketsTable";
 import { LANDING_ROWS } from "@/lib/mock";
@@ -30,6 +31,23 @@ export function IntroStage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [reduced, setReduced] = useState(false);
 
+  /**
+   * Choose a video, then fetch it. Not the other way round.
+   *
+   * The sources used to sit in the markup, so the browser began pulling the
+   * full-size file the moment the page parsed — and the effect below then
+   * swapped in the small one, after the expensive request was already in
+   * flight. On a phone in Lagos, which is who this is for, that is the whole
+   * cost of the page spent before anything is decided.
+   *
+   * Nothing is declared in the markup now. The poster carries the first frame
+   * while this runs, which it did anyway.
+   *
+   * Three tiers, by what the connection can carry:
+   *   reduce-motion or save-data → no video at all, the poster stands
+   *   2g/3g, or a narrow screen  → 480 (800 KB) or 720 (1.5 MB)
+   *   anything else              → 1080 (2.6 MB)
+   */
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -37,25 +55,32 @@ export function IntroStage() {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setReduced(true);
       v.removeAttribute("autoplay");
-      v.pause();
       return;
     }
 
     type Conn = { saveData?: boolean; effectiveType?: string };
     const conn = (navigator as Navigator & { connection?: Conn }).connection;
-    const light =
-      window.innerWidth <= 820 ||
-      conn?.saveData === true ||
-      (conn?.effectiveType ? /2g|3g/.test(conn.effectiveType) : false);
 
-    if (light) {
-      v.innerHTML = "";
-      const s = document.createElement("source");
-      s.src = "/media/parallel-hero-720.mp4";
-      s.type = "video/mp4";
-      v.append(s);
-      v.load();
+    // Somebody who has asked their phone to use less data has asked us too.
+    if (conn?.saveData === true) {
+      setReduced(true);
+      v.removeAttribute("autoplay");
+      return;
     }
+
+    const slow = conn?.effectiveType ? /(^|\W)(2g|slow-2g|3g)/.test(conn.effectiveType) : false;
+    const narrow = window.innerWidth <= 820;
+    const src = slow
+      ? "/media/parallel-hero-480.mp4"
+      : narrow
+        ? "/media/parallel-hero-720.mp4"
+        : "/media/parallel-hero-1080.mp4";
+
+    const source = document.createElement("source");
+    source.src = src;
+    source.type = "video/mp4";
+    v.append(source);
+    v.load();
     void v.play().catch(() => {
       /* autoplay can be refused; the poster carries the frame */
     });
@@ -140,19 +165,17 @@ export function IntroStage() {
         {/* One rectangle. Two contents. */}
         <div className="intro-frame" ref={frameRef}>
           <div className="intro-video">
+            {/* No <source> here on purpose — see the effect above. */}
             <video
               ref={videoRef}
               autoPlay
               muted
               loop
               playsInline
-              preload="metadata"
+              preload="none"
               poster="/media/parallel-hero-poster.jpg"
               aria-hidden="true"
-            >
-              <source src="/media/parallel-hero-1080.webm" type="video/webm" />
-              <source src="/media/parallel-hero-1080.mp4" type="video/mp4" />
-            </video>
+            />
 
             <div className="logo-float" aria-hidden="true">
               <div className="logo-shadow" />
@@ -184,9 +207,9 @@ export function IntroStage() {
                   Priced from the street rate people actually pay.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link href="/app/trade" className="btn btn-light" style={{ height: 50, padding: "0 26px" }}>
+                  <AppLink href="/app/trade" className="btn btn-light" style={{ height: 50, padding: "0 26px" }}>
                     Start trading
-                  </Link>
+                  </AppLink>
                   <Link href="/docs" className="btn btn-glass" style={{ height: 50, padding: "0 22px" }}>
                     How it works
                   </Link>

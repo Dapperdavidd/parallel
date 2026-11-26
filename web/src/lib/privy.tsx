@@ -3,7 +3,6 @@
 import { Buffer } from "buffer";
 import React from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
-import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 
 if (typeof window !== "undefined") {
@@ -79,7 +78,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               },
             },
           },
-          externalWallets: { solana: { connectors: toSolanaWalletConnectors() } },
+          // External wallet connectors are deliberately not configured.
+          //
+          // They were, and they cost two 188 KB fetches of the WalletConnect
+          // registry on every app page load, plus the connector bundles — for
+          // a path nothing in this app can reach. Sign-in is email, which
+          // creates an embedded wallet, and no screen offers to connect
+          // Phantom or anything else.
+          //
+          // Re-enabling is one line:
+          //   externalWallets: { solana: { connectors: toSolanaWalletConnectors() } }
+          // with the import from "@privy-io/react-auth/solana". Worth doing
+          // when there is a button that uses it, and not before.
           appearance: { theme: "dark", accentColor: "#C8F04A" },
         }}
       >

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { AppLink } from "./AppLink";
 import { useMarkets } from "@/lib/live";
 
 /**
@@ -129,9 +129,9 @@ export function StatusBoard() {
               <div className="srow" key={m.c}>
                 <b>
                   <span className={`sdot is-${tone}`} />
-                  <Link href={`/app/trade?m=${m.c}`} style={{ color: "inherit" }}>
+                  <AppLink href={`/app/trade?m=${m.c}`} style={{ color: "inherit" }}>
                     USD/{m.c}
-                  </Link>
+                  </AppLink>
                 </b>
                 <span className="mono">
                   {m.paused

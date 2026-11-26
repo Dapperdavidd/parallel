@@ -1,11 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/styles/design.css";
-import { DemoProvider } from "@/lib/store";
 import { ToastProvider } from "@/components/Toast";
 import { LiveProvider } from "@/lib/live";
-import { WalletProvider } from "@/lib/privy";
-import { PercolatorTradeProvider } from "@/lib/usePercolatorTrade";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -41,19 +38,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="sr-only">
           Skip to content
         </a>
-        {/* One store for the whole site keeps Privy auth and the local position
-            view in sync as the user moves between sign-in and the app. */}
-        {/* LiveProvider lays the real index over the sample data, so every
-            screen shows live prices without having been rebuilt. */}
-        <WalletProvider>
-          <PercolatorTradeProvider>
-            <DemoProvider>
-              <LiveProvider>
-                <ToastProvider>{children}</ToastProvider>
-              </LiveProvider>
-            </DemoProvider>
-          </PercolatorTradeProvider>
-        </WalletProvider>
+        {/* Only two providers at the root, and both are cheap.
+            `LiveProvider` lays the real index over the sample data, so every
+            screen — including the landing table — shows live prices.
+            Everything to do with wallets lives in `<WalletStack>`, mounted by
+            /app and /signin, because the Privy SDK is most of the
+            JavaScript on this site and the docs do not need it. */}
+        <LiveProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </LiveProvider>
       </body>
     </html>
   );

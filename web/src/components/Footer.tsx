@@ -19,6 +19,19 @@ function TileIcon({ d, stroke }: { d: string; stroke: string }) {
   );
 }
 
+/**
+ * Footer links into the app do not prefetch.
+ *
+ * Next prefetches a linked route's JavaScript when the link enters the
+ * viewport. The footer is on every marketing and documentation page and links
+ * to /app and /signin — so reading the FAQ pulled down the wallet SDK, the
+ * Solana kit and the connectors, about half a megabyte, for a page made of
+ * prose. On the connections this product is for, that is the whole page
+ * budget spent on a navigation that may never happen.
+ *
+ * The cost of turning it off is a slightly slower first click, which is paid
+ * only by people who actually click.
+ */
 export function Footer() {
   return (
     <footer
@@ -42,9 +55,9 @@ export function Footer() {
         <div className="fcols">
           <div>
             <h4>Trade</h4>
-            <Link href="/app/markets">Markets</Link>
-            <Link href="/app/trade?m=NGN">USD/NGN</Link>
-            <Link href="/app/hedge">Hedge mode</Link>
+            <Link href="/app/markets" prefetch={false}>Markets</Link>
+            <Link href="/app/trade?m=NGN" prefetch={false}>USD/NGN</Link>
+            <Link href="/app/hedge" prefetch={false}>Hedge mode</Link>
           </div>
           <div>
             <h4>Docs</h4>
@@ -62,13 +75,13 @@ export function Footer() {
             <Link href="/vaults">Liquidity vaults</Link>
             <Link href="/docs/risks">Risk disclosure</Link>
             <Link href="/status">System status</Link>
-            <Link href="/signin">Sign in / Sign up</Link>
+            <Link href="/signin" prefetch={false}>Sign in / Sign up</Link>
           </div>
         </div>
       </div>
 
       <div className="tiles">
-        <Link href="/app/trade" className="tile main">
+        <Link href="/app/trade" prefetch={false} className="tile main">
           <TileIcon d="M3 17l6-6 4 4 7-7M14 8h7v7" stroke="currentColor" />
           <span>
             <b className="tile-t">Start trading</b>
