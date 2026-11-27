@@ -3,7 +3,7 @@
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 
 export const PERCOLATOR_PROGRAM_ID = new PublicKey(
-  "Bu1J8eQQN2mNnUgisSEd5StBG6zDaRb7fwDjN34VzgLG",
+  "ETx36xGKMcfnWEwap89NfMFkVYGgD7nbPZGa2FrJKhDM",
 );
 export const PORTFOLIO_ACCOUNT_LEN = 9411;
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");

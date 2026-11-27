@@ -66,7 +66,7 @@ test("address accepts a wallet and refuses an off-curve key", () => {
   // is refused where a wallet is required and accepted where any account is.
   const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from("parallel")],
-    new PublicKey("Bu1J8eQQN2mNnUgisSEd5StBG6zDaRb7fwDjN34VzgLG"),
+    new PublicKey("ETx36xGKMcfnWEwap89NfMFkVYGgD7nbPZGa2FrJKhDM"),
   );
   throws(() => address()(pda.toBase58(), "wallet"), /wallet address/);
   assert.equal(accountAddress()(pda.toBase58(), "portfolio").toBase58(), pda.toBase58());

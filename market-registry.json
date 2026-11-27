@@ -1,6 +1,6 @@
 {
   "network": "devnet",
-  "percolatorProgram": "Bu1J8eQQN2mNnUgisSEd5StBG6zDaRb7fwDjN34VzgLG",
+  "percolatorProgram": "ETx36xGKMcfnWEwap89NfMFkVYGgD7nbPZGa2FrJKhDM",
   "collateralMint": "6W4yrqeCDsN6Z1YwasT2X2RTgTVfZB7t77UYHRzbjd18",
   "oracleAuthority": "8iApLfrsJBNDkZYFNxZqvr1QVAmm6NFmAdqLaiXi8jHu",
   "markets": [
@@ -11,19 +11,19 @@
       "unitLabel": "kNGN",
       "status": "live",
       "maxLeverage": 5,
-      "market": "3DjLeHeYRXTtCUozjGvjsVuFwUV3NyWEdVrBsk8gpBmV",
-      "vault": "ByNsVoNZ8ugzZ8hvoi7eudBZpR2eiQ4ZN7tn1szNHbBf",
+      "market": "BhL8A1bHXkWNtA1uisKBWnMBDsq94xL1q7uAwtpiFmPL",
+      "vault": "Ck1yEKah1LJ7e14ST4jKtKfNtDKhKWmCru4R9THf2Z8u",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "694028",
-      "createdAt": "2026-11-21T21:15:34.437Z",
+      "initialPriceE6": "694815",
+      "createdAt": "2026-11-27T13:18:40.843Z",
       "liquidityVault": {
         "authority": "HtmEV5b5xygzheNM44eTm1LH25kkt7fae3XTxGjo4gaH",
-        "portfolio": "HTRaZU9kmt6X1E62U3nueTXmwKaMFB7qvvD7FEvJ2EzC",
+        "portfolio": "BtnvHDBPNzsjQ1JMXcm3MgAtn7RGcHKPka27nYJVuVy4",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:09.536Z"
+        "createdAt": "2026-11-27T13:23:01.251Z"
       }
     },
     {
@@ -33,19 +33,19 @@
       "unitLabel": "10ZAR",
       "status": "live",
       "maxLeverage": 5,
-      "market": "FvoHAVvJKv3d128d1YZtuWrv14XYzET1VNWYqQUa2rFo",
-      "vault": "7iguh445D8atPaH3j4S3MxipXZjoNeWmtqpyuF7Wzmw9",
+      "market": "8ivfWTKoumhVxQ8DAsKZy9ymjRPynA8T7eFvUUEGzRno",
+      "vault": "BaPEdbysj4WUD8WV1TfLgLCs3qA9NUNLcetHpvwt2ZMW",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "566199",
-      "createdAt": "2026-11-21T21:15:39.826Z",
+      "initialPriceE6": "573383",
+      "createdAt": "2026-11-27T13:20:26.490Z",
       "liquidityVault": {
         "authority": "4hLepscjzPhvCdgE7L6uQx9BzMVS1fPuNCKZVZoUGmQW",
-        "portfolio": "5vqgZAkJePxBbVt1hGeCCtw6YBrEtNS5HJ6EkTSiknBU",
+        "portfolio": "5MwApb5Y7Jcc9kb7wRLAVhjr2mDAUKuYmtSsociTYQq4",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:13.296Z"
+        "createdAt": "2026-11-27T13:23:04.218Z"
       }
     },
     {
@@ -55,19 +55,19 @@
       "unitLabel": "kARS",
       "status": "live",
       "maxLeverage": 5,
-      "market": "BkFtAwechhSpX5qcbtfJ1wvTfzPWEiJTFEiWqBSv7dc8",
-      "vault": "HgeapY6mJCRBCF2x2NQXLEK2AQ2HJc1uMTMVuY74oxqm",
+      "market": "4wsFShVuuBSrBsWehBfL5WPWSDBD2ft5GkADqXK2QezW",
+      "vault": "41vMxEXqjv2ETSuQ5fPo2a36zaqUHoZzkYUZCCcRmdNv",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "564972",
-      "createdAt": "2026-11-21T21:15:44.516Z",
+      "initialPriceE6": "575484",
+      "createdAt": "2026-11-27T13:20:32.102Z",
       "liquidityVault": {
         "authority": "2ktBzaiMRQDJzNxRnnwzTr4bnb4iFxceFfXKbcVj7rzC",
-        "portfolio": "FJWCK2o4wFp21bLVUtANYvrcbPkpKUrTGz25EShRM2hj",
+        "portfolio": "ERAcTC7fz9XW4i8pzUqwiBViumKMjtSTAKWojhuzUVxP",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:16.870Z"
+        "createdAt": "2026-11-27T13:23:10.345Z"
       }
     },
     {
@@ -77,19 +77,19 @@
       "unitLabel": "BRL",
       "status": "live",
       "maxLeverage": 5,
-      "market": "EprtCPFkhKGmXRuCBefRMYdPzWWWfrupcxDxew8ZTtJK",
-      "vault": "AdDmAaZ1WkTzuS95u9ZaKPff9UXfryjErEwMnoFN9B1a",
+      "market": "Buz6pjq7tK61aqHozT1SrMZJKtBCqhR5aZ8keBFL8dQX",
+      "vault": "7bLjhEJF6Kw8fTPZ1Snemb1qSK8aFtm1mM5FtDNCY2Kg",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "164388",
-      "createdAt": "2026-11-21T21:15:47.259Z",
+      "initialPriceE6": "180785",
+      "createdAt": "2026-11-27T13:20:35.734Z",
       "liquidityVault": {
         "authority": "8niNuDSGGdxMWq1M5qHyuWn148eVwipGtZKbjtgBKUXz",
-        "portfolio": "DxJewVUQE1SYuZvsCDBAcAkXZqvRt65zk6VxXaeJN5U4",
+        "portfolio": "BU4qfA3PZ2KJSZMmApc83DD9crBrcEFL2fbdDBy2hq2S",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:20.148Z"
+        "createdAt": "2026-11-27T13:23:14.176Z"
       }
     },
     {
@@ -99,19 +99,19 @@
       "unitLabel": "10MXN",
       "status": "live",
       "maxLeverage": 5,
-      "market": "GYw7LK36CwNK3DUpWddeRhDiCymQYq6xFYrhvC8T1Tzc",
-      "vault": "5UbM9biicemooEumipfiGHX1hsnzakou36NKur3UXiVt",
+      "market": "3QccjeEzeGA2SDNgauTe4eMwXriVAMAPXv1tQKzTWxdG",
+      "vault": "7wLY1ataCkfqfaeHZ2PAwN381M8YuC6GpYngKzpAGhrd",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "520901",
-      "createdAt": "2026-11-21T21:15:51.071Z",
+      "initialPriceE6": "512151",
+      "createdAt": "2026-11-27T13:20:41.453Z",
       "liquidityVault": {
         "authority": "CgifU1dJb6QCaRNT4EqwkJX82WnVnegCZH547CurTL5G",
-        "portfolio": "2Sf9izQ2QWh41aJB2SY7yAhiqDTx9ppqGmqGna8Z4ZgW",
+        "portfolio": "7X2vEEfCWVeRrZFZYuip585bEkoX5oCAwDDMof618dgm",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:23.597Z"
+        "createdAt": "2026-11-27T13:23:16.991Z"
       }
     },
     {
@@ -121,19 +121,19 @@
       "unitLabel": "kCOP",
       "status": "live",
       "maxLeverage": 5,
-      "market": "CLbk2PTANTEbZVHAYeph2LSWvJXH7XsDmrDivaaEthPG",
-      "vault": "HM9wTEAos6CReC2oD9ujaAGr52e8K9mjoULkriq5nupj",
+      "market": "3FNfZxF5fDJVxbq14Z2222gwfPaTdQJrjWvJRSJLJmy9",
+      "vault": "6xv29huiE7bUyc2TZz24Lf2Uz1RZhvfFTapM54SKxrKA",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "287998",
-      "createdAt": "2026-11-21T21:15:54.670Z",
+      "initialPriceE6": "286738",
+      "createdAt": "2026-11-27T13:20:46.140Z",
       "liquidityVault": {
         "authority": "3DsGHcPT1HqUThWjx1exdskC9htcwJpeSXjA9d9uEP1L",
-        "portfolio": "8yRD9QaYaAx2747RTgNzKKuQCtgUr3c3dBQ5RPoHTu9e",
+        "portfolio": "3gUNg6pUcb2T3NQDDUuZ4W5mFYWbZ4tF1h25MY4oseb4",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:27.078Z"
+        "createdAt": "2026-11-27T13:23:20.769Z"
       }
     },
     {
@@ -143,19 +143,19 @@
       "unitLabel": "10TRY",
       "status": "live",
       "maxLeverage": 5,
-      "market": "92hwudFccCkxZTxqVTFc7bz8S3KNjQ1hKAbFS4ML2QqN",
-      "vault": "4ntkCZevqQkVBsAsuHJvQXZgZViHbj5zN4z3RskUeMdg",
+      "market": "DeBtSoxU4jqv3HpCxPitzHrhXxcxK3ts2uT1o8vix8zj",
+      "vault": "DPGDc2UrnX5GcHTRetWzmNU4J8mbK7UM1ihMr6AuY3Cd",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "196909",
-      "createdAt": "2026-11-21T21:15:57.828Z",
+      "initialPriceE6": "197529",
+      "createdAt": "2026-11-27T13:20:50.464Z",
       "liquidityVault": {
         "authority": "CMv7HioU1hieoVXLq5TsqrcX71s6JJmqh6DfHQbdr6m5",
-        "portfolio": "B7AqM4RAdzhvDjtrFcoguXHTDRQmkwRCT2G2T7aVFXVh",
+        "portfolio": "H3Pu7PNttVqPZkrVdGzzr17PMz1Qm6hGMVWLuPfF2FvT",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:30.515Z"
+        "createdAt": "2026-11-27T13:23:24.024Z"
       }
     },
     {
@@ -165,19 +165,19 @@
       "unitLabel": "100INR",
       "status": "live",
       "maxLeverage": 5,
-      "market": "3Fzz2Bx3YhnPLeZXfLhvqFXkEMsboboXQmiT36Rtf5Py",
-      "vault": "HzXXReAt9X3EBvuow7euNK3np7gkKb3HASRXob1xZep9",
+      "market": "4tCW4sQmpDG5MoU7XTVGWVsRVX2TNCMqfs23Z54S6gqG",
+      "vault": "4GvpHBjSt9ahGsf9xivueJyYrjgBh3jHsx7V4ERMUkJg",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "960984",
-      "createdAt": "2026-11-21T21:16:02.364Z",
+      "initialPriceE6": "968804",
+      "createdAt": "2026-11-27T13:20:58.513Z",
       "liquidityVault": {
         "authority": "ECQKS4S6Yiww8ZUhFTPVZeP2TZTX97Rh1hxh3G4ce19a",
-        "portfolio": "HcemfRMHk1DYNJxk6rtyVkSn9WhP6DGxyXWeWyUc2sUt",
+        "portfolio": "Cn4DF1mfoYfJcwsyuu6vK551RCrPj3fzo4cQ4RxrDrJf",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:34.405Z"
+        "createdAt": "2026-11-27T13:23:27.766Z"
       }
     },
     {
@@ -187,107 +187,19 @@
       "unitLabel": "100PHP",
       "status": "live",
       "maxLeverage": 5,
-      "market": "GzJ3PDrTsNzio7auk6nW7zr9isfuTLak6ztCbEobXQNb",
-      "vault": "E9RYirD3ff74MN6AUWaeZf2Udrtbs8M2X5FjfEhs6koQ",
+      "market": "5fyqA3rzAFuDhwPF8ERZVSYVGcbkdG79tPUmMvitQrEG",
+      "vault": "JZ4U4k9MqCuDi2GjSU4htEFRKVaybefQfNqkPV9Uoc9",
       "assetIndex": 0,
       "authMarkWire": "short",
-      "initialPriceE6": "1563172",
-      "createdAt": "2026-11-21T21:16:09.215Z",
+      "initialPriceE6": "1568812",
+      "createdAt": "2026-11-27T13:21:02.950Z",
       "liquidityVault": {
         "authority": "AKKm2tGfn1iHcQbAFExJseC9cieXyPDogReQ7eBxNG62",
-        "portfolio": "7PTxCdzGfcb2c8CbPw98wZg2HDewxfVc2eaK6Tq5TiXn",
+        "portfolio": "8HhL3rDFpPDVAB4yij9oP24DbwKF15xt91fBmxchsW29",
         "capitalAtoms": "50000000000",
         "maxNotionalUsdc": 5000,
         "maxOpenInterestUsdc": 50000,
-        "createdAt": "2026-11-21T23:47:38.272Z"
-      }
-    },
-    {
-      "id": "USD/KES",
-      "currency": "KES",
-      "unit": 100,
-      "unitLabel": "100KES",
-      "status": "beta",
-      "maxLeverage": 2,
-      "market": "V78RmgNyhj3G8FJPLc6PodJgTdxZqxFqFw5FkcuovSk",
-      "vault": "B3VVka1xS4ZU1ntcBy7D2nb9nYykWM5fRhJNH6m2hAkQ",
-      "assetIndex": 0,
-      "authMarkWire": "short",
-      "initialPriceE6": "759734",
-      "createdAt": "2026-11-21T21:36:02.498Z",
-      "liquidityVault": {
-        "authority": "FkFxKFLyygtmLA1YVmhSpPyeDE8brdWfUESp737ujJHu",
-        "portfolio": "21S6U8gAs1ZQoedD5HPmip2tgrFozSbkQmmnUcrMfBux",
-        "capitalAtoms": "50000000000",
-        "maxNotionalUsdc": 2000,
-        "maxOpenInterestUsdc": 20000,
-        "createdAt": "2026-11-21T23:47:41.589Z"
-      }
-    },
-    {
-      "id": "USD/GHS",
-      "currency": "GHS",
-      "unit": 10,
-      "unitLabel": "10GHS",
-      "status": "beta",
-      "maxLeverage": 2,
-      "market": "4aEYCWuLyo9NVGvem36H4ktfyP9RrugyTbWr1ih35mn8",
-      "vault": "AstL8qDkXSugmniBTrqTdJ6LqyjZJTpfjasCGDJwa53y",
-      "assetIndex": 0,
-      "authMarkWire": "short",
-      "initialPriceE6": "805477",
-      "createdAt": "2026-11-21T21:36:05.727Z",
-      "liquidityVault": {
-        "authority": "8wAyjXFV5uhVqGjLX2mj7oE1y3mhkMz4hLAhb3LyCgZr",
-        "portfolio": "4gLjguk7JNdq1jUHaWpNvxp6tJQmh4XKFLUMi27NtK8c",
-        "capitalAtoms": "50000000000",
-        "maxNotionalUsdc": 2000,
-        "maxOpenInterestUsdc": 20000,
-        "createdAt": "2026-11-21T23:47:44.831Z"
-      }
-    },
-    {
-      "id": "USD/EGP",
-      "currency": "EGP",
-      "unit": 100,
-      "unitLabel": "100EGP",
-      "status": "beta",
-      "maxLeverage": 2,
-      "market": "3SUbg6FW1c4sVP9pXcMfRyUZtCGrYYm1mXyKAhjWFfGh",
-      "vault": "aJgWpcoSwBxwARbK3a7mZUpJi5yHFLHQDgypHEpJbYn",
-      "assetIndex": 0,
-      "authMarkWire": "short",
-      "initialPriceE6": "1801315",
-      "createdAt": "2026-11-21T21:36:09.131Z",
-      "liquidityVault": {
-        "authority": "3Xd3HRZ15TzB5q2UMt2vZywkQdnA5h6WkMpmQNWrTicY",
-        "portfolio": "Ad6zbGst6N8fFhyDzJyVBFpfoUcfYXeyUaWFjpn43gzN",
-        "capitalAtoms": "50000000000",
-        "maxNotionalUsdc": 2000,
-        "maxOpenInterestUsdc": 20000,
-        "createdAt": "2026-11-21T23:47:47.947Z"
-      }
-    },
-    {
-      "id": "USD/PKR",
-      "currency": "PKR",
-      "unit": 100,
-      "unitLabel": "100PKR",
-      "status": "beta",
-      "maxLeverage": 2,
-      "market": "82ydgrfQLpesGHbdMXW7pEV5jQpJMBGUUwbn298ss14Y",
-      "vault": "F22btpXbJYcoZuuAK4SDTFpG7VkbQXKXTqfKsNEEJfKC",
-      "assetIndex": 0,
-      "authMarkWire": "short",
-      "initialPriceE6": "343448",
-      "createdAt": "2026-11-21T21:36:12.084Z",
-      "liquidityVault": {
-        "authority": "3eYvd33iAN3JpZ4iZL4mZ4GEeBmPSyF5waeTdvWEaALj",
-        "portfolio": "9ciw9wPrCWS7HHhAdPUYr5dLMeTTdLUtMBs3RibF6daT",
-        "capitalAtoms": "50000000000",
-        "maxNotionalUsdc": 2000,
-        "maxOpenInterestUsdc": 20000,
-        "createdAt": "2026-11-21T23:47:51.227Z"
+        "createdAt": "2026-11-27T13:23:30.841Z"
       }
     }
   ]

@@ -38,6 +38,7 @@ import { Turnkey } from "@turnkey/sdk-server";
 import { TurnkeySigner } from "@turnkey/solana";
 import { loadRegistry, type Registry } from "../lib/registry.js";
 import { refusalReason } from "../lib/signer-policy.js";
+import { readSource, SOURCES } from "../lib/sources.js";
 import { stayAlive } from "../lib/stay-alive.js";
 
 const MAX_BODY_BYTES = 8 * 1024;
@@ -173,6 +174,24 @@ async function handle(
   key: Buffer,
   backend: KeyBackend,
 ): Promise<void> {
+  const url = new URL(request.url ?? "/", "http://parallel.local");
+  if (request.method === "GET" && url.pathname === "/source/okx") {
+    const market = url.searchParams.get("market");
+    const source = SOURCES.find(
+      (candidate) => candidate.market === market && candidate.id === "okx_p2p",
+    );
+    if (!source) {
+      send(response, 404, { error: "unknown market" });
+      return;
+    }
+    const reading = await readSource(source, { timeoutMs: 12_000, retries: 1 });
+    if (!reading.ok) {
+      send(response, 503, { error: "source unavailable" });
+      return;
+    }
+    send(response, 200, { rate: reading.rate });
+    return;
+  }
   if (request.url === "/health") {
     send(response, 200, { ok: true, markets: registry.markets.length, keyBackend: backend });
     return;

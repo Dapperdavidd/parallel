@@ -4,7 +4,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { warn } from "./log";
 
 export const PERCOLATOR_PROGRAM_ID = new PublicKey(
-  "Bu1J8eQQN2mNnUgisSEd5StBG6zDaRb7fwDjN34VzgLG",
+  "ETx36xGKMcfnWEwap89NfMFkVYGgD7nbPZGa2FrJKhDM",
 );
 export const POS_SCALE = 1_000_000n;
 export const PORTFOLIO_ACCOUNT_LEN = 9_411;

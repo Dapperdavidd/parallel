@@ -320,8 +320,10 @@ const invokedDirectly =
   process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "");
 if (invokedDirectly) {
   mkdirSync("out", { recursive: true });
-  main().catch((err) => {
-    console.error("create-markets failed:", err);
-    process.exit(1);
-  });
+  void main()
+    .then(() => process.exit(process.exitCode ?? 0))
+    .catch((err) => {
+      console.error("create-markets failed:", err);
+      process.exit(1);
+    });
 }

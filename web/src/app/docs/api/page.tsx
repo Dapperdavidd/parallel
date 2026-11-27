@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     "On-chain addresses, the index data model and the price conventions Parallel settles against on Solana devnet.",
 };
 
-const PROGRAM_ID = "Bu1J8eQQN2mNnUgisSEd5StBG6zDaRb7fwDjN34VzgLG";
+const PROGRAM_ID = "ETx36xGKMcfnWEwap89NfMFkVYGgD7nbPZGa2FrJKhDM";
 
 function Code({ children }: { children: React.ReactNode }) {
   return <code className="doc-code">{children}</code>;

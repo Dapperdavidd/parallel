@@ -24,10 +24,10 @@ import { dirname } from "node:path";
 
 export const DEVNET_RPC = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
 
-/** Live Percolator v16 wrapper on devnet. See DECISIONS.md §3.2 — this is NOT
- *  either of the two program IDs quoted in the PRD, both of which are v12-era. */
+/** Project-owned Percolator v16 wrapper on devnet, built from pinned canonical
+ *  source at 70294cb and deployed during the §7.27.12 recovery migration. */
 export const PERCOLATOR_PROGRAM_ID = new PublicKey(
-  "Bu1J8eQQN2mNnUgisSEd5StBG6zDaRb7fwDjN34VzgLG",
+  "ETx36xGKMcfnWEwap89NfMFkVYGgD7nbPZGa2FrJKhDM",
 );
 
 /** Passive/vAMM matcher, for the TradeCpi path. Not used by the Phase 1 spikes. */
