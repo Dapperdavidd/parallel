@@ -148,15 +148,11 @@ const binanceP2P = (market: string, fiat: string): SourceDef => ({
  */
 const okxP2P = (market: string, fiat: string): SourceDef => ({
   id: "okx_p2p", label: "OKX P2P", market, kind: "p2p",
-  url: process.env.PARALLEL_OKX_RELAY_URL
-    ? `${process.env.PARALLEL_OKX_RELAY_URL.replace(/\/$/, "")}/source/okx?market=${encodeURIComponent(market)}`
-    : `https://www.okx.com/v3/c2c/tradingOrders/books?quoteCurrency=${fiat}` +
-      `&baseCurrency=USDT&side=sell&paymentMethod=all&userType=all`,
+  url: `https://www.okx.com/v3/c2c/tradingOrders/books?quoteCurrency=${fiat}` +
+    `&baseCurrency=USDT&side=sell&paymentMethod=all&userType=all`,
   note: "best sell offer from the public C2C book",
   parse: (j) => {
-    const relay = obj(j, "okx_p2p");
-    if ("rate" in relay) return num(relay.rate, "okx_p2p.rate");
-    const sell = arr(obj(relay.data, "okx_p2p.data").sell, "okx_p2p.sell");
+    const sell = arr(obj(obj(j, "okx_p2p").data, "okx_p2p.data").sell, "okx_p2p.sell");
     if (sell.length === 0) throw new Error("empty P2P book");
     const best = Math.min(
       ...sell.slice(0, 10).map((a) => num(obj(a, "okx_p2p ad").price, "okx_p2p.price")),

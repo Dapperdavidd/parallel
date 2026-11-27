@@ -201,6 +201,94 @@
         "maxOpenInterestUsdc": 50000,
         "createdAt": "2026-11-27T13:23:30.841Z"
       }
+    },
+    {
+      "id": "USD/KES",
+      "currency": "KES",
+      "unit": 100,
+      "unitLabel": "100KES",
+      "status": "beta",
+      "maxLeverage": 2,
+      "market": "9TN2x7JvCfLtwSxQGB5s5q9uZXgSHyxF3yNxGUbdvAsc",
+      "vault": "AGWbuxcCXgJszmMx1spieFP2rrLE6tAth3DsCLteUjfE",
+      "assetIndex": 0,
+      "authMarkWire": "short",
+      "initialPriceE6": "762486",
+      "createdAt": "2026-11-27T13:34:59.155Z",
+      "liquidityVault": {
+        "authority": "FkFxKFLyygtmLA1YVmhSpPyeDE8brdWfUESp737ujJHu",
+        "portfolio": "2b9pJBtYnTX5fRDcBJc8gRgmiT6JgSNUuF5NtEj8ZRig",
+        "capitalAtoms": "50000000000",
+        "maxNotionalUsdc": 2000,
+        "maxOpenInterestUsdc": 20000,
+        "createdAt": "2026-11-27T13:35:26.972Z"
+      }
+    },
+    {
+      "id": "USD/GHS",
+      "currency": "GHS",
+      "unit": 10,
+      "unitLabel": "10GHS",
+      "status": "beta",
+      "maxLeverage": 2,
+      "market": "6oZLz74hNXi5nJnrXGNUmuJ3wHT5ViCvHMAmoDXiSWAu",
+      "vault": "6QT1ALtJcEFkGPRRKv38e8QBZg6WedyBLErGTap8Hmks",
+      "assetIndex": 0,
+      "authMarkWire": "short",
+      "initialPriceE6": "800320",
+      "createdAt": "2026-11-27T13:35:03.574Z",
+      "liquidityVault": {
+        "authority": "8wAyjXFV5uhVqGjLX2mj7oE1y3mhkMz4hLAhb3LyCgZr",
+        "portfolio": "2n9nZMbbmjDVmrbDLh4truNM55TXWdbj88dJK9exuTz3",
+        "capitalAtoms": "50000000000",
+        "maxNotionalUsdc": 2000,
+        "maxOpenInterestUsdc": 20000,
+        "createdAt": "2026-11-27T13:35:32.724Z"
+      }
+    },
+    {
+      "id": "USD/EGP",
+      "currency": "EGP",
+      "unit": 100,
+      "unitLabel": "100EGP",
+      "status": "beta",
+      "maxLeverage": 2,
+      "market": "2m6LWpvJDw8JpoBQ1sexpabhM2RixPLNeiVKGVVQKnhz",
+      "vault": "6tG7VKad7EvJhiNs9fVdTgzpeLspL8FFDgDa3D6uomtY",
+      "assetIndex": 0,
+      "authMarkWire": "short",
+      "initialPriceE6": "1784280",
+      "createdAt": "2026-11-27T13:35:07.775Z",
+      "liquidityVault": {
+        "authority": "3Xd3HRZ15TzB5q2UMt2vZywkQdnA5h6WkMpmQNWrTicY",
+        "portfolio": "2YPjHephQkiQjmvNbEEkrhWmP5LaU2KGyTwQsfYXvnat",
+        "capitalAtoms": "50000000000",
+        "maxNotionalUsdc": 2000,
+        "maxOpenInterestUsdc": 20000,
+        "createdAt": "2026-11-27T13:35:35.424Z"
+      }
+    },
+    {
+      "id": "USD/PKR",
+      "currency": "PKR",
+      "unit": 100,
+      "unitLabel": "100PKR",
+      "status": "beta",
+      "maxLeverage": 2,
+      "market": "ETSxcPVbmDPVUePjPAVvoQrVdfu3C7ReP2XWm7uXM31U",
+      "vault": "H12KqwQE84bgxVm5LtKXaBj5Gpf4KUPCDY7XNUMHcmc2",
+      "assetIndex": 0,
+      "authMarkWire": "short",
+      "initialPriceE6": "344828",
+      "createdAt": "2026-11-27T13:35:11.919Z",
+      "liquidityVault": {
+        "authority": "3eYvd33iAN3JpZ4iZL4mZ4GEeBmPSyF5waeTdvWEaALj",
+        "portfolio": "AVA5RUW5bvyvTUq5dDWfgLE4KpBKM3cCWDeaHZJxrDou",
+        "capitalAtoms": "50000000000",
+        "maxNotionalUsdc": 2000,
+        "maxOpenInterestUsdc": 20000,
+        "createdAt": "2026-11-27T13:35:37.890Z"
+      }
     }
   ]
 }
